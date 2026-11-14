@@ -252,24 +252,48 @@ func set_saber_animations() -> void :
 	if character.saber_node.current_weapon.name != "D-Glaive":
 		saber_sound.play()
 
-func _StartCondition() -> bool:
+func air_charges() -> int:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump == null:
+		return 1
+	return airjump.current_air_jumps
+
+func spend_air_charge() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		airjump.reduce_air_jumps(1)
+
+func can_start_in_air() -> bool:
+	# 空中叶断突：只有觉醒 Zero 能用，并且占用一次二段跳资源
+	if not CharacterManager.awakened_zero_armor:
+		return false
+	return air_charges() > 0
+
+func can_take_input() -> bool:
+	# 罗刹旋会调用它来让路：空中叶断突优先级更高，否则同一帧会串键
 	if not character.Youdantotsu:
-		return false
-	if character.get_action_pressed("move_up") or character.get_action_pressed("move_down"):
-		return false
-	if not character.get_action_pressed("move_left") and not character.get_action_pressed("move_right"):
 		return false
 	if get_action_pressed("dash"):
 		return false
 	if character.combo_connection_youdantotsu():
 		return true
+	if character.get_action_pressed("move_up") or character.get_action_pressed("move_down"):
+		return false
+	if not character.get_action_pressed("move_left") and not character.get_action_pressed("move_right"):
+		return false
+	if character.is_on_floor():
+		return true
+	return can_start_in_air()
+
+func _StartCondition() -> bool:
+	if not can_take_input():
+		return false
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false
-	if not executing:
-		if character.is_on_floor():
-			return true
-	return false
+	if executing:
+		return false
+	return true
 	
 func _ResetCondition() -> bool:
 	return false
@@ -311,6 +335,8 @@ func _Setup() -> void :
 		effect_emit("youdantotsu_awaken")
 
 	horizontal_speed = start_speed
+	if not character.is_on_floor():
+		spend_air_charge()
 	update_bonus_horizontal_only_conveyor()
 	set_saber_animations()
 	ending_saber_state = false

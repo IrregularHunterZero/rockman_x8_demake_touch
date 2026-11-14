@@ -189,7 +189,7 @@ func _StartCondition() -> bool:
 		return false
 	if character.get_action_pressed("move_down") and character.is_on_floor() and CharacterManager.extra_saber_combo and CharacterManager.extra_saber_05:
 		return false
-	if character.get_action_pressed("move_up") and character.is_on_floor() and CharacterManager.player_desperation:
+	if character.get_action_pressed("move_up") and desperation_has_priority():
 		return false
 	if character.get_action_pressed("alt_fire"):
 		return false
@@ -201,6 +201,16 @@ func _StartCondition() -> bool:
 
 func _ResetCondition() -> bool:
 	return false
+
+# Desperation owns "up + special" whenever it is actually able to fire,
+# on the ground or in the air. Keeps both abilities from fighting over the input.
+func desperation_has_priority() -> bool:
+	var desperation = get_parent().get_node_or_null("Desperation")
+	if desperation == null:
+		return false
+	if not desperation.has_method("can_start_here"):
+		return false
+	return desperation.can_start_here()
 
 func _EndCondition() -> bool:
 	if end_state():

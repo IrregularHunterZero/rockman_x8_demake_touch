@@ -32,6 +32,17 @@ onready var saber_sound: AudioStreamPlayer = $saber
 var jumped: bool = false
 var descend: bool = false
 
+# ==== 空中起手：按二段跳（AirJump）的上升曲线来升 ====
+# 参数直接读 AirJump 节点，所以普通 Zero 与觉醒 Zero 各自升到自己的二段跳高度，
+# 冰龙升和罗刹旋也自动一致；地面起手仍用本技能自己的 jump_velocity。
+var started_on_floor: bool = false
+var ascend_velocity: float = 190.0
+var ascend_time_max: float = 0.625
+var ascend_fullspeed_proportion: float = 0.19
+var ascend_fullspeed_time: float = 0.0
+var ascend_slowdown_time: float = 0.0
+var ascending: bool = false
+
 onready var particles = $particles2D
 var start_speed = 90
 var horizontal_speed = start_speed
@@ -101,7 +112,10 @@ func jump_frame():
 			particles.emitting = true
 			particles.position = Vector2(25 * get_facing_direction(), - 3)
 			particles.z_index = animatedSprite.z_index + 1
-			character.set_vertical_speed( - jump_velocity)
+			if started_on_floor:
+				character.set_vertical_speed( - jump_velocity)
+			else:
+				start_air_jump_ascent()
 			jumped = true
 			if CharacterManager.awakened_zero_armor or character.get_action_pressed("select_special"):
 				if CharacterManager.awakened_zero_armor:
@@ -159,10 +173,68 @@ func set_saber_animations():
 		animatedSprite.frame = 6
 	saber_sound.play()
 
+func air_charges() -> int:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump == null:
+		return 1
+	return airjump.current_air_jumps
+
+func spend_air_charge() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		airjump.reduce_air_jumps(1)
+
+# ==== 空中起手用的上升曲线（参数见文件头部） ====
+
+func attack_is_held() -> bool:
+	if actions.size() == 0:
+		return true
+	return character.get_action_pressed(actions[0])
+
+func start_air_jump_ascent() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		ascend_velocity = airjump.jump_velocity
+		ascend_time_max = airjump.max_jump_time
+		ascend_fullspeed_proportion = airjump.fullspeed_proportion
+	if ascend_time_max <= 0.0:
+		ascend_time_max = 0.625
+	ascend_fullspeed_time = 0.0
+	ascend_slowdown_time = 0.0
+	ascending = true
+	character.set_vertical_speed(0)
+
+func ascend_slowdown_value() -> float:
+	var remain = ascend_time_max - ascend_fullspeed_time
+	if remain <= 0.0:
+		return 0.0
+	var value = remain - ascend_slowdown_time / remain
+	if value < 0.0:
+		return 0.0
+	return value
+
+func process_air_jump_ascent(delta: float) -> void:
+	if ascending:
+		if not attack_is_held():
+			ascending = false
+		elif character.get_vertical_speed() > 0:
+			ascending = false
+		else:
+			var value = ascend_slowdown_value()
+			if value == 0.0:
+				ascending = false
+			elif ascend_fullspeed_time / ascend_time_max < ascend_fullspeed_proportion:
+				character.set_vertical_speed( - ascend_velocity)
+				ascend_fullspeed_time += delta
+			else:
+				character.set_vertical_speed( - ascend_velocity * value)
+				ascend_slowdown_time += delta
+	process_gravity(delta)
+
 func _StartCondition() -> bool:
 	if not character.Hyouryuushou:
 		return false
-	if character.Hyouryuushou_used:
+	if not character.is_on_floor() and air_charges() <= 0:
 		return false
 	if not character.get_action_pressed("move_up"):
 		return false
@@ -191,17 +263,20 @@ func _EndCondition() -> bool:
 	return false
 
 func _Setup() -> void :
+	started_on_floor = character.is_on_floor()
+	ascending = false
 	horizontal_speed = start_speed
 	update_bonus_horizontal_only_conveyor()
 	set_saber_animations()
 	jumped = false
 	descend = false
-	character.Hyouryuushou_used = true
+	if not character.is_on_floor():
+		spend_air_charge()
 	character.dashjumps_since_jump = 0
 
 func _Update(_delta: float) -> void :
 	if jumped:
-		process_gravity(_delta)
+		process_air_jump_ascent(_delta)
 		
 	jump_frame()
 	loop_animation()

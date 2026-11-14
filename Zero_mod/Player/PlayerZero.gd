@@ -450,7 +450,8 @@ func equip_awakened_zero_parts() -> void :
 	get_node("DashWallJump").max_jump_time = 0.75
 	get_node("DashWallJump").jump_velocity = 420
 	airjump.max_jump_time = 0.75
-	airjump.jump_velocity = 230
+	airjump.jump_velocity = 420
+	airjump.fullspeed_proportion = 0.19
 	
 	
 	dash.horizontal_velocity = 400

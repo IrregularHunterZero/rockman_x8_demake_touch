@@ -21,6 +21,9 @@ var desperation_speed = 400
 var extra_damage = 1
 var h = 0
 
+# allow casting in the air; set to true to restore the original ground-only gate
+export var require_ground: bool = false
+
 func player_desperation() -> void :
 	if not create_slash:
 		create_slash = true
@@ -92,24 +95,30 @@ func movement_frames() -> bool:
 	return animatedSprite.frame >= 9 and animatedSprite.frame < 23
 
 func _StartCondition() -> bool:
+	if not can_start_here():
+		return false
+	if not character.get_action_pressed("move_up"):
+		return false
+	if character.get_action_pressed("select_special"):
+		return true
+	return false
+
+# single source of truth for the non-input part of the gate;
+# Genmuzero also asks this so both abilities agree on who owns up + special
+func can_start_here() -> bool:
 	if not CharacterManager.player_desperation:
 		return false
 	if not use_genmu.has_ammo_expent(10):
 		return false
 	if not use_genmu.first_time_casted:
 		return false
-	var _animation = get_parent().get_animation()
-	if _animation in character.saber_animations:
+	if get_parent().get_animation() in character.saber_animations:
 		return false
 	if character.get_action_pressed("move_down"):
 		return false
-	if not character.get_action_pressed("move_up"):
+	if require_ground and not character.is_on_floor():
 		return false
-	if not character.is_on_floor():
-		return false
-	if character.get_action_pressed("select_special"):
-		return true
-	return false
+	return true
 
 func _ResetCondition() -> bool:
 	return false
@@ -126,6 +135,8 @@ func _Setup() -> void :
 	create_slash = false
 	slash_end = false
 	animatedSprite.animation = "victory"
+	character.set_vertical_speed(0)
+	character.set_horizontal_speed(0)
 
 func _Update(_delta: float) -> void :
 	update_bonus_horizontal_only_conveyor()

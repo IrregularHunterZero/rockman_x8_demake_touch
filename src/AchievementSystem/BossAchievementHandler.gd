@@ -11,7 +11,10 @@ const busters: = [
 	"JumpDamage", 
 	"Axl Bullet", 
 	"Copy Bullet", 
-	"Saber"
+	"Saber", 
+	"ZBuster", 
+	"SwordWave", 
+	"Shingetsurin"
 ]
 
 export  var defeated_any: bool = true

@@ -49,6 +49,16 @@ var cast_time_max: float = 0.35
 var cast_time: float = 0.0
 var vertical_last: float = 0.0
 
+# ==== 空中起手：按二段跳（AirJump）的上升曲线来升 ====
+# 参数直接读 AirJump 节点，所以普通 Zero 与觉醒 Zero 各自升到自己的二段跳高度，
+# 和冰龙升完全一致；按得久就升满，松攻击键就停。
+var ascend_velocity: float = 190.0
+var ascend_time_max: float = 0.625
+var ascend_fullspeed_proportion: float = 0.19
+var ascend_fullspeed_time: float = 0.0
+var ascend_slowdown_time: float = 0.0
+var ascending: bool = false
+
 onready var effect_scene: PackedScene = preload("res://System/misc/visual_effect.tscn")
 var effect_spawn_position: Vector2 = Vector2(0, 0)
 var effect_spawn_timer: float = 0.0
@@ -230,10 +240,78 @@ func reset_saber_animation() -> void :
 			animatedSprite.frame = 0
 		ending_saber_state = false
 
+func air_charges() -> int:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump == null:
+		return 1
+	return airjump.current_air_jumps
+
+func spend_air_charge() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		airjump.reduce_air_jumps(1)
+
+func youdantotsu_has_priority() -> bool:
+	var youdantotsu = get_parent().get_node_or_null("Youdantotsu")
+	if youdantotsu == null:
+		return false
+	if not youdantotsu.has_method("can_take_input"):
+		return false
+	return youdantotsu.can_take_input()
+
+# ==== 空中起手用的上升曲线（参数见文件头部） ====
+
+func attack_is_held() -> bool:
+	if actions.size() == 0:
+		return true
+	return character.get_action_pressed(actions[0])
+
+func start_air_jump_ascent() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		ascend_velocity = airjump.jump_velocity
+		ascend_time_max = airjump.max_jump_time
+		ascend_fullspeed_proportion = airjump.fullspeed_proportion
+	if ascend_time_max <= 0.0:
+		ascend_time_max = 0.625
+	ascend_fullspeed_time = 0.0
+	ascend_slowdown_time = 0.0
+	ascending = true
+	character.set_vertical_speed(0)
+
+func ascend_slowdown_value() -> float:
+	var remain = ascend_time_max - ascend_fullspeed_time
+	if remain <= 0.0:
+		return 0.0
+	var value = remain - ascend_slowdown_time / remain
+	if value < 0.0:
+		return 0.0
+	return value
+
+func process_air_jump_ascent(delta: float) -> void:
+	if ascending:
+		if not attack_is_held():
+			ascending = false
+		elif character.get_vertical_speed() > 0:
+			ascending = false
+		else:
+			var value = ascend_slowdown_value()
+			if value == 0.0:
+				ascending = false
+			elif ascend_fullspeed_time / ascend_time_max < ascend_fullspeed_proportion:
+				character.set_vertical_speed( - ascend_velocity)
+				ascend_fullspeed_time += delta
+			else:
+				character.set_vertical_speed( - ascend_velocity * value)
+				ascend_slowdown_time += delta
+	process_gravity(delta)
+
 func _StartCondition() -> bool:
 	if not character.Rasetsusen:
 		return false
-	if character.Rasetsusen_used:
+	if youdantotsu_has_priority():
+		return false
+	if air_charges() <= 0:
 		return false
 	if character.get_action_pressed("move_up"):
 		return false
@@ -269,7 +347,8 @@ func _Setup() -> void :
 	character.set_horizontal_speed(0)
 	character.set_vertical_speed(0)
 	character.dashfall = false
-	character.Rasetsusen_used = true
+	spend_air_charge()
+	ascending = false
 	fly_up = false
 	falling_down = false
 	timer = 0.0
@@ -297,7 +376,7 @@ func _Update(_delta: float) -> void :
 				character.dashjumps_since_jump = 1
 		if character.get_action_pressed("move_up"):
 			falling_down = true
-			character.set_vertical_speed( - jump_velocity)
+			start_air_jump_ascent()
 			fly_up = true
 			if character.get_action_pressed("move_left") or character.get_action_pressed("move_right"):
 				horizontal_speed = dashjump_speed
@@ -310,10 +389,7 @@ func _Update(_delta: float) -> void :
 	else:
 		horizontal_velocity = horizontal_speed
 		if fly_up:
-			if cast_time < cast_time_max:
-				character.set_vertical_speed( - jump_velocity)
-			else:
-				process_gravity(_delta)
+			process_air_jump_ascent(_delta)
 		if character.saber_node.current_weapon.name == "K-Knuckle" and not fly_up and (timer >= max_time or character.get_action_pressed("move_down")):
 			character.set_vertical_speed(jump_velocity)
 		if character.saber_node.current_weapon.name == "V-Hanger" and not fly_up and (timer >= max_time or character.get_action_pressed("move_down")):

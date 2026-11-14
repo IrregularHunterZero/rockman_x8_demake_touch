@@ -1,25 +1,78 @@
 extends DashJumpZero
 class_name DoubleJumpZero
 
-onready var airdash: = character.get_node("AirDash")
 var max_air_jumps: int = 1
 var current_air_jumps: int = 0
 var should_end_walljump: bool = false
 var should_end_dashwalljump: bool = false
 
+# ==== time based recharge (replaces land / wall resets) ====
+export var time_based_recharge: bool = true
+# 0.47s = 二段跳顶点到落地的滞空时间：
+#   一段跳 320 速 / 0.19 满速比 -> 顶点 57px（上升 0.38s）
+#   二段跳 190 速 / 0.30 满速比 -> 再 +41px（上升 0.37s，冻结期）
+#   从 98px 顶点按 900 重力、375 终端速度落地 = 0.467s
+# 即"放完二段跳，落地的同时刚好回一格"。
+export var recharge_time: float = 0.47
+export var refill_on_land: bool = false
+# awakened Zero's "A" option (full power) removes the recharge entirely
+export var no_cooldown_when_awakened: bool = true
+# 空中这些招式执行期间冻结回充：它们的动画会把人悬在半空，
+# 不冻结就等于"拖时间换回充"，可以无限续。
+export var recharge_blocking_moves: Array = ["AirJump", "AirDash", "Rasetsusen", "Hyouryuushou", "Youdantotsu", "Raikousen"]
+var recharge_progress: float = 0.0
+
 
 func _ready() -> void :
 	if active:
-		character.listen("land", self, "reset_jump_count")
-		character.listen("ride", self, "reset_jump_count")
-		character.listen("wallslide", self, "reset_jump_count")
-		character.listen("walljump", self, "reset_jump_count")
+		if refill_on_land or not time_based_recharge:
+			character.listen("land", self, "reset_jump_count")
+			character.listen("ride", self, "reset_jump_count")
+			character.listen("wallslide", self, "reset_jump_count")
+			character.listen("walljump", self, "reset_jump_count")
 		character.listen("firedash", self, "reduce_air_jumps")
+	recharge_progress = 0.0
+
+func _physics_process(delta: float) -> void :
+	._physics_process(delta)
+	recharge(delta)
+
+func recharge(delta: float) -> void :
+	if not time_based_recharge or not active:
+		return
+	if is_full_power_awakened():
+		current_air_jumps = max_air_jumps
+		recharge_progress = 0.0
+		return
+	if is_recharge_blocked():
+		return
+	if current_air_jumps >= max_air_jumps:
+		recharge_progress = 0.0
+		return
+	if recharge_time <= 0.0:
+		current_air_jumps = max_air_jumps
+		recharge_progress = 0.0
+		return
+	recharge_progress += delta
+	while recharge_progress >= recharge_time and current_air_jumps < max_air_jumps:
+		recharge_progress -= recharge_time
+		current_air_jumps += 1
+	if current_air_jumps >= max_air_jumps:
+		recharge_progress = 0.0
+
+func is_recharge_blocked() -> bool:
+	if not active:
+		return false
+	if character.is_on_floor():
+		return false
+	for move in character.executing_moves:
+		if move.name in recharge_blocking_moves:
+			return true
+	return false
 
 func _Setup() -> void :
 	interrupt_if_needed()
 	reduce_air_jumps(1)
-	reduce_airdash_count(1)
 	if character.get_action_pressed(dash_action):
 		horizontal_velocity = dashjump_speed
 		character.dashjump_signal()
@@ -30,12 +83,13 @@ func _Setup() -> void :
 
 func reset_jump_count(_dummy: = null):
 	current_air_jumps = max_air_jumps
+	recharge_progress = 0.0
+
+func is_full_power_awakened() -> bool:
+	return no_cooldown_when_awakened and CharacterManager.awakened_zero_armor and CharacterManager.awakened_zero_full_power_max
 
 func reduce_air_jumps(amount: = 1):
-	current_air_jumps -= amount
-	
-func reduce_airdash_count(amount: = 1) -> void :
-	airdash.reduce_airdash_count(amount)
+	current_air_jumps = max(0, current_air_jumps - amount)
 	
 func emit_dashjump() -> void :
 	pass
@@ -43,6 +97,7 @@ func emit_dashjump() -> void :
 func set_max_air_jumps(value: int):
 	max_air_jumps = value
 	current_air_jumps = value
+	recharge_progress = 0.0
 	Log("setting max airjumps:" + str(current_air_jumps))
 
 func _StartCondition() -> bool:

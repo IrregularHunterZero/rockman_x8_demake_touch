@@ -103,20 +103,44 @@ func set_saber_animations():
 		animatedSprite.animation = "youdantotsuawaken"
 	saber_sound.play()
 	
-func _StartCondition() -> bool:
+func air_charges() -> int:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump == null:
+		return 1
+	return airjump.current_air_jumps
+
+func spend_air_charge() -> void:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		airjump.reduce_air_jumps(1)
+
+func can_start_in_air() -> bool:
+	# 空中叶断突：只有觉醒 Zero 能用，并且占用一次二段跳资源
+	if not CharacterManager.awakened_zero_armor:
+		return false
+	return air_charges() > 0
+
+func can_take_input() -> bool:
+	# 罗刹旋会调用它来让路：空中叶断突优先级更高，否则同一帧会串键
 	if not character.Youdantotsu:
 		return false
 	if character.get_action_pressed("move_up") or character.get_action_pressed("move_down"):
 		return false
 	if not character.get_action_pressed("move_left") and not character.get_action_pressed("move_right"):
 		return false
+	if character.is_on_floor():
+		return true
+	return can_start_in_air()
+
+func _StartCondition() -> bool:
+	if not can_take_input():
+		return false
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false
-	if not executing:
-		if character.is_on_floor():
-			return true
-	return false
+	if executing:
+		return false
+	return true
 	
 func _ResetCondition() -> bool:
 	return false
@@ -134,6 +158,8 @@ func _EndCondition() -> bool:
 
 func _Setup() -> void :
 	horizontal_speed = start_speed
+	if not character.is_on_floor():
+		spend_air_charge()
 	update_bonus_horizontal_only_conveyor()
 	set_saber_animations()
 
@@ -170,7 +196,10 @@ func change_animation_if_falling(_s) -> void :
 
 func _Interrupt():
 	._Interrupt()
-	character.play_animation("saber_recover")
+	if character.is_on_floor():
+		character.play_animation("saber_recover")
+	else:
+		character.play_animation("fall")
 	if is_instance_valid(current_hitbox):
 		current_hitbox.queue_free()
 	character.alpha_alway_1 = false

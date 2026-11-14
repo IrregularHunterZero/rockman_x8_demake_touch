@@ -9,6 +9,16 @@ export  var play_desperation_music: bool = true
 export  var order_size: int = 32
 export  var desperation_chance: float = 1.0
 
+# ==== desperation cooldown, replaces the difficulty based dice roll ====
+# seconds per difficulty: rookie, normal, hard, insane (ninja handled separately)
+export  var desperation_cooldowns: Array = [120.0, 60.0, 30.0, 20.0]
+export  var ninja_cooldown_start: float = 20.0
+export  var ninja_cooldown_min: float = 10.0
+# > 0 overrides the table for this boss only
+export  var desperation_cooldown_override: float = 0.0
+# 0 = unlimited reuses, 1 = this boss may only ever use it once
+export  var max_desperation_uses: int = 0
+
 onready var character = get_parent()
 
 var exceptions: Array = ["EnemyStun", "BossStun", "Intro", "Idle", "FlyIdle", "BossDeath"]
@@ -17,6 +27,8 @@ var order_of_attacks: Array = []
 var attacks_used: int = 0
 var desperation_attack
 var used_desperation: bool = false
+var desperation_uses: int = 0
+var desperation_cooldown: float = 0.0
 var timer: float = 0.0
 var timer_for_next_attack: float = 1.0
 var label: Label
@@ -73,21 +85,12 @@ func decide_next_attack():
 	if attack_moveset.size() == 0:
 		return
 	
-	if has_desperation_attack() and not used_desperation:
-		if character.current_health <= floor(character.max_health * desperation_threshold) - 1:
-			used_desperation = true
-			if play_desperation_music:
-				Event.emit_signal("play_angry_boss_music")
-			return desperation_attack
-	
-	
-	if CharacterManager.game_mode >= 1:
-		if has_desperation_attack() and used_desperation:
-			if character.current_health <= floor(character.max_health * desperation_threshold) - 1:
-				var chance = randi() %100
-				if chance < desperation_chance:
-
-					return desperation_attack
+	if can_use_desperation():
+		used_desperation = true
+		desperation_uses += 1
+		if play_desperation_music:
+			Event.emit_signal("play_angry_boss_music")
+		return desperation_attack
 	
 	var no = get_next_attack()
 	var next_attack = attack_moveset[no]
@@ -172,6 +175,7 @@ func validate_order_of_attacks() -> void:
 	BossRNG.decided_attack_order(character.name,order_of_attacks)
 
 func _physics_process(delta: float) -> void :
+	process_desperation_cooldown(delta)
 	process_next_attack(delta)
 
 func process_next_attack(delta: float) -> void :
@@ -238,6 +242,8 @@ func not_attacking() -> bool:
 	return character.is_executing("Idle")
 
 func attack_ended(_attack) -> void :
+	if _attack == desperation_attack:
+		start_desperation_cooldown()
 	timer = 0.01
 	decide_time_for_next_attack()
 
@@ -255,6 +261,41 @@ func remove_from_attack_order(attack: AttackAbility) -> void :
 		order_of_attacks.erase(id)
 		attacks_used -= 1
 		Log("New order: " + str(order_of_attacks))
+
+func can_use_desperation() -> bool:
+	if not has_desperation_attack():
+		return false
+	if max_desperation_uses > 0 and desperation_uses >= max_desperation_uses:
+		return false
+	# keeps the old "once only" escape hatch (e.g. Sigma's Overdrive sets this to 0)
+	if desperation_uses > 0 and desperation_chance <= 0.0:
+		return false
+	if character.current_health > floor(character.max_health * desperation_threshold) - 1:
+		return false
+	if desperation_uses == 0:
+		return true
+	return desperation_cooldown <= 0.0
+
+func process_desperation_cooldown(delta: float) -> void :
+	if desperation_cooldown > 0.0:
+		desperation_cooldown = max(0.0, desperation_cooldown - delta)
+
+func start_desperation_cooldown() -> void :
+	desperation_cooldown = get_desperation_cooldown_duration()
+	Log("Desperation cooldown: " + str(desperation_cooldown))
+
+func get_desperation_cooldown_duration() -> float:
+	if desperation_cooldown_override > 0.0:
+		return desperation_cooldown_override
+	if CharacterManager.game_mode >= 3:
+		var health_ratio: float = clamp(float(character.current_health) / float(character.max_health), 0.0, 1.0)
+		return lerp(ninja_cooldown_min, ninja_cooldown_start, health_ratio)
+	var index: int = CharacterManager.game_mode + 1
+	if index < 0:
+		index = 0
+	if index > desperation_cooldowns.size() - 1:
+		index = desperation_cooldowns.size() - 1
+	return float(desperation_cooldowns[index])
 
 func Log(message) -> void :
 	if debug_logs:
