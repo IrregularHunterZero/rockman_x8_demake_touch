@@ -1482,6 +1482,12 @@ margin_right = 32.0
 margin_bottom = -18.0
 text = "3w"
 
+[node name="HoverZero" type="Node2D" parent="."]
+script = ExtResource( 167 )
+conflicting_moves = [ "Death", "WeaponStasis", "Damage", "Ride" ]
+actions = [ "jump" ]
+animation = "awaken_beam"
+
 [node name="AirJump" type="Node2D" parent="."]
 script = ExtResource( 45 )
 __meta__ = {
@@ -1499,12 +1505,6 @@ fullspeed_proportion = 0.3
 [node name="audioStreamPlayer" type="AudioStreamPlayer" parent="AirJump"]
 pause_mode = 2
 bus = "SFX"
-
-[node name="Hover" type="Node2D" parent="."]
-script = ExtResource( 167 )
-conflicting_moves = [ "Death", "WeaponStasis", "Damage", "Ride" ]
-actions = [ "jump" ]
-animation = "awaken_beam"
 
 [node name="Walk" type="Node2D" parent="."]
 script = ExtResource( 7 )
