@@ -28,10 +28,8 @@ export var requires_awakened_armor: bool = true
 
 var down_armed: bool = false
 
-# 能压着悬停放的派生动作。悬停要负责两件事：别抢它们的动画，别抢它们的走位。
+# 能压着悬停放的派生动作。悬停对它们只做两件事：别抢动画，垂直别往下沉。
 const hover_attacks: Array = ["SaberCombo", "SaberJump", "SaberDash", "SaberWall", "Juuhazan", "Youdantotsu", "Hyouryuushou"]
-# 自己会横向/纵向走的派生：水平速度交给动作自己，悬停只保证"别往下沉"。
-const self_moving_attacks: Array = ["Youdantotsu", "Hyouryuushou"]
 
 
 func should_execute_on_hold() -> bool:
@@ -88,9 +86,9 @@ func _Setup() -> void:
 
 func _Update(_delta: float) -> void:
 	zero_bonus_horizontal_speed()
-	if attack_drives_movement():
-		# 叶断突、冰龙升这类自己走位的派生：水平速度归它们，悬停只保证别往下沉
-		# （它们自己设的上升速度保留，所以在上升帧里不动垂直速度）。
+	if attack_is_executing():
+		# 派生动作的位移一律沿用攻击自己的逻辑：该原地罚站的就罚站，该前突的就前突，
+		# 悬停不碰水平方向。垂直只兜住"别往下沉"，但放过动作自己的上升速度（冰龙升）。
 		if character.get_vertical_speed() >= 0.0:
 			character.set_vertical_speed(0)
 		refresh_hover_animation()
@@ -113,12 +111,6 @@ func _Update(_delta: float) -> void:
 
 func attack_is_executing() -> bool:
 	for move_name in hover_attacks:
-		if character.is_executing(move_name):
-			return true
-	return false
-
-func attack_drives_movement() -> bool:
-	for move_name in self_moving_attacks:
 		if character.is_executing(move_name):
 			return true
 	return false

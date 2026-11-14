@@ -699,7 +699,9 @@ func should_add_saber_extra_combo():
 	return false
 
 func set_saber_animations():
-	if character.is_on_floor():
+	# 整套动作原本按"站在地上"写死，悬停里的下+攻击派生要复用它，
+	# 所以把"在地面上"放宽成"在地面上，或者正压着悬停"。
+	if character.is_on_floor() or character.is_executing("HoverZero"):
 		if slashes == 0:
 			animatedSprite.animation = "saber_1"
 			if character.saber_node.current_weapon.name == "Saber":
@@ -802,7 +804,7 @@ func set_saber_animations():
 	slashes += 1
 
 func set_saber_extra_animations():
-	if character.is_on_floor():
+	if character.is_on_floor() or character.is_executing("HoverZero"):
 		if slashes == 0:
 			animatedSprite.animation = "saber_1"
 			if character.saber_node.current_weapon.name == "Saber":
