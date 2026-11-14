@@ -297,7 +297,8 @@ func _Update(_delta: float) -> void :
 		input_buffer.pop_front()
 		set_saber_animations()
 
-	process_gravity(_delta)
+	if not character.is_executing("HoverZero"):
+		process_gravity(_delta)
 	
 	if character.dashfall:
 		set_movement_and_direction(dashjump_speed, _delta)

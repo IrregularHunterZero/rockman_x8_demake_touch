@@ -360,6 +360,11 @@ func charged_saber_release(charge_level) -> void :
 	if not character.has_control():
 		Log("Couldn\'t charged fire, character has no control")
 		return
+	# Charge 的 conflicting_moves 里带 "Nothing"，所以高优先级的悬停挡不住蓄力释放；
+	# 在悬停里放出来的话动作会被悬停的动画覆盖、还会互相抢重力，这里直接不让它出。
+	if character.is_executing("HoverZero"):
+		Log("Couldn\'t charged fire, hovering")
+		return
 	if not CharacterManager.extra_saber_combo:
 		return
 	if character.is_executing("Intro") or \

@@ -70,6 +70,10 @@ func BeforeEveryFrame(delta: float) -> void :
 	activate_low_jumpcasts_after_delay(delta)
 	
 func _StartCondition() -> bool:
+	# 悬停执行期间不接管下落：否则悬停让出高优先级的那几帧（按着手炮/冲刺时）
+	# Fall 会启动并每帧追加一次重力，表现为"悬着却慢慢往下掉"。
+	if character.is_executing("HoverZero"):
+		return false
 	if not character.is_on_floor():
 		return true
 	return false

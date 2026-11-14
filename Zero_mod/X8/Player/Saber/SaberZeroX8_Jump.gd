@@ -588,7 +588,7 @@ func _Update(_delta: float) -> void :
 		input_buffer.pop_front()
 		set_saber_animations()
 
-	if not character.is_executing("WallJump") and not character.is_executing("DashWallJump"):
+	if not character.is_executing("WallJump") and not character.is_executing("DashWallJump") and not character.is_executing("HoverZero"):
 		process_gravity(_delta)
 	
 	if character.dashfall:
