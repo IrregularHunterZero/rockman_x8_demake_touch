@@ -166,6 +166,7 @@
 [ext_resource path="res://Zero_mod/SFX/OZ/charge6.ogg" type="AudioStream" id=164]
 [ext_resource path="res://Zero_mod/SFX/charge_saber.ogg" type="AudioStream" id=165]
 [ext_resource path="res://Zero_mod/SFX/OZ/omega_intro.ogg" type="AudioStream" id=166]
+[ext_resource path="res://Zero_mod/Player/HoverZero.gd" type="Script" id=167]
 
 [sub_resource type="RectangleShape2D" id=32]
 extents = Vector2( 6.995, 7 )
@@ -1498,6 +1499,12 @@ fullspeed_proportion = 0.3
 [node name="audioStreamPlayer" type="AudioStreamPlayer" parent="AirJump"]
 pause_mode = 2
 bus = "SFX"
+
+[node name="Hover" type="Node2D" parent="."]
+script = ExtResource( 167 )
+conflicting_moves = [ "Death", "WeaponStasis", "Damage", "Ride" ]
+actions = [ "jump" ]
+animation = "awaken_beam"
 
 [node name="Walk" type="Node2D" parent="."]
 script = ExtResource( 7 )

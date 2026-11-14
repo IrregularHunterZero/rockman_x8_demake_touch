@@ -19,7 +19,7 @@ export var refill_on_land: bool = false
 export var no_cooldown_when_awakened: bool = true
 # 空中这些招式执行期间冻结回充：它们的动画会把人悬在半空，
 # 不冻结就等于"拖时间换回充"，可以无限续。
-export var recharge_blocking_moves: Array = ["AirJump", "AirDash", "Rasetsusen", "Hyouryuushou", "Youdantotsu", "Raikousen"]
+export var recharge_blocking_moves: Array = ["AirJump", "AirDash", "Rasetsusen", "Hyouryuushou", "Youdantotsu", "Raikousen", "Hover"]
 var recharge_progress: float = 0.0
 
 
