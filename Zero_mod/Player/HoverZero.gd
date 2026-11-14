@@ -7,8 +7,13 @@ class_name HoverZero
 # 退出：松开跳键、落地、贴墙、或接上空中冲刺。
 # 允许的派生：
 #   - 冲刺键按下 -> 空中冲刺照常启动，悬停当场结束，之后和悬停无关。
-#   - 装了手炮（Z-Buster / 节点名 Z-Breaker）时按攻击 -> 手炮普通攻击照常发射，
-#     悬停不中断，攻击动作播完自动回到悬停循环（跳跃键没松就一直悬着）。
+#   - 装了手炮（Z-Buster / 节点名 Z-Breaker）时的攻击派生，悬停不中断，
+#     攻击动作播完自动回到悬停循环（跳跃键没松就一直悬着）：
+#       攻击                 -> 手炮普通攻击（SaberJump）
+#       下 + 攻击            -> 手炮下段派生（SaberCombo 的 saber_shot_fast1/2）
+#       上 + 特殊攻击        -> 冰龙升（手炮版是 Drift Diamond 弹）
+#       左右 + 特殊攻击      -> 叶断突
+#       特殊攻击（无方向）   -> 十文字斩的手炮版（连续炮击），不再是空中的罗刹旋
 #   其余攻击仍然派生不出来（悬停是高优先级）。
 # 资源：悬停不消耗 AirJump 的空中资源，空中冲刺也与它无关；
 #       但悬停期间空中资源不恢复（DoubleJumpZero.recharge_blocking_moves 里有 "HoverZero"）。
@@ -23,16 +28,21 @@ export var requires_awakened_armor: bool = true
 
 var down_armed: bool = false
 
+# 能压着悬停放的派生动作。悬停要负责两件事：别抢它们的动画，别抢它们的走位。
+const hover_attacks: Array = ["SaberCombo", "SaberJump", "SaberDash", "SaberWall", "Juuhazan", "Youdantotsu", "Hyouryuushou"]
+# 自己会横向/纵向走的派生：水平速度交给动作自己，悬停只保证"别往下沉"。
+const self_moving_attacks: Array = ["Youdantotsu", "Hyouryuushou"]
+
 
 func should_execute_on_hold() -> bool:
 	return true
 
 func is_high_priority() -> bool:
-	# 上面两个允许的派生需要在同一帧启动（框架先判"能不能启动"，再判"要不要结束"），
+	# 允许的派生需要在同一帧启动（框架先判"能不能启动"，再判"要不要结束"），
 	# 所以按下对应按键的这段时间先让出高优先级；结束判定在 _EndCondition 里做。
 	if character.get_action_pressed("dash"):
 		return false
-	if character.get_action_pressed("fire") and buster_equipped():
+	if buster_equipped() and (character.get_action_pressed("fire") or character.get_action_pressed("alt_fire")):
 		return false
 	return true
 
@@ -78,6 +88,13 @@ func _Setup() -> void:
 
 func _Update(_delta: float) -> void:
 	zero_bonus_horizontal_speed()
+	if attack_drives_movement():
+		# 叶断突、冰龙升这类自己走位的派生：水平速度归它们，悬停只保证别往下沉
+		# （它们自己设的上升速度保留，所以在上升帧里不动垂直速度）。
+		if character.get_vertical_speed() >= 0.0:
+			character.set_vertical_speed(0)
+		refresh_hover_animation()
+		return
 	set_movement_and_direction(horizontal_velocity, _delta)
 	# 起手时按住的那个"下"不算下压，否则一进悬停就往下掉；
 	# 松开一次之后，"下"才开始正常下降。
@@ -94,18 +111,24 @@ func _Update(_delta: float) -> void:
 		character.set_vertical_speed(0)
 	refresh_hover_animation()
 
-func is_saber_attack_executing() -> bool:
-	for move in character.executing_moves:
-		if move.name == "SaberCombo" or move.name == "SaberJump" or move.name == "SaberDash" or move.name == "SaberWall":
+func attack_is_executing() -> bool:
+	for move_name in hover_attacks:
+		if character.is_executing(move_name):
+			return true
+	return false
+
+func attack_drives_movement() -> bool:
+	for move_name in self_moving_attacks:
+		if character.is_executing(move_name):
 			return true
 	return false
 
 func refresh_hover_animation() -> void:
 	if hover_animation == "":
 		return
-	# 手炮的攻击动作还在播的时候别抢动画，播完再回到悬停循环
-	# （不能只看当前动画名：saber_jump 本身就是 saber_animations 里的一员）
-	if is_saber_attack_executing():
+	# 攻击动作还在播的时候别抢动画，播完再回到悬停循环
+	# （不能只看当前动画名：saber_jump / juuhazan 本身就在 saber_animations 里）
+	if attack_is_executing():
 		return
 	if character.get_animation() != hover_animation:
 		character.play_animation(hover_animation)
@@ -125,8 +148,8 @@ func _EndCondition() -> bool:
 func _Interrupt() -> void:
 	._Interrupt()
 	character.set_vertical_speed(0)
-	# 交给空中冲刺/手炮动作的话就别覆盖它们的动画
-	if character.is_executing("AirDash") or is_saber_attack_executing():
+	# 交给空中冲刺/攻击动作的话就别覆盖它们的动画
+	if character.is_executing("AirDash") or attack_is_executing():
 		return
 	if character.is_on_floor():
 		character.play_animation("idle")

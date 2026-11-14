@@ -213,6 +213,9 @@ func process_air_jump_ascent(delta: float) -> void:
 func _StartCondition() -> bool:
 	if not character.Rasetsusen:
 		return false
+	# 悬停时"特殊攻击无方向"走的是地面上的十文字斩，空中的罗刹旋让路
+	if character.is_executing("HoverZero"):
+		return false
 	if youdantotsu_has_priority():
 		return false
 	if air_charges() <= 0:

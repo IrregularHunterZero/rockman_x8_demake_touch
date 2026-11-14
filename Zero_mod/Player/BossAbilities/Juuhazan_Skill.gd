@@ -180,7 +180,15 @@ func _StartCondition() -> bool:
 	if not executing:
 		if character.is_on_floor():
 			return true
+		# 悬停时"特殊攻击无方向"派生地面上的十文字斩（连续炮击），让罗刹旋让路
+		if hover_buster_derivation():
+			return true
 	return false
+
+func hover_buster_derivation() -> bool:
+	if not character.is_executing("HoverZero"):
+		return false
+	return character.saber_node.current_weapon.name == "Z-Breaker"
 	
 func _ResetCondition() -> bool:
 	return false
@@ -223,7 +231,8 @@ func _Update(_delta: float) -> void :
 		force_movement(0)
 	
 
-	process_gravity(_delta)
+	if not character.is_executing("HoverZero"):
+		process_gravity(_delta)
 	update_bonus_horizontal_only_conveyor()
 
 func change_animation_if_falling(_s) -> void :

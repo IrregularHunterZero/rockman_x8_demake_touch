@@ -973,7 +973,18 @@ func _StartCondition() -> bool:
 	if not executing:
 		if character.is_on_floor():
 			return true
+		# 悬停中的手炮下段派生：动作和地面上是同一套（saber_shot_fast1/2），
+		# 滞空由 HoverZero 保持，动作播完自动回到悬停循环。
+		if hover_buster_down_derivation():
+			return true
 	return false
+
+func hover_buster_down_derivation() -> bool:
+	if not character.is_executing("HoverZero"):
+		return false
+	if not character.get_action_pressed("move_down"):
+		return false
+	return character.saber_node.current_weapon.name == "Z-Breaker"
 
 func _ResetCondition() -> bool:
 	return false
@@ -1017,7 +1028,8 @@ func _Update(_delta: float) -> void :
 			set_saber_animations()
 	
 	force_movement(0)
-	process_gravity(_delta)
+	if not character.is_executing("HoverZero"):
+		process_gravity(_delta)
 	update_bonus_horizontal_only_conveyor()
 
 func change_animation_if_falling(_s) -> void :
