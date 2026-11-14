@@ -263,10 +263,19 @@ func spend_air_charge() -> void:
 	if airjump != null:
 		airjump.reduce_air_jumps(1)
 
+func buster_equipped() -> bool:
+	return character.saber_node.current_weapon.name == "Z-Breaker"
+
+func costs_air_resource() -> bool:
+	# 手炮版的叶断突只是放一发炮，不带自己的位移，不该占空中资源
+	return not buster_equipped()
+
 func can_start_in_air() -> bool:
 	# 空中叶断突：只有觉醒 Zero 能用，并且占用一次二段跳资源
 	if not CharacterManager.awakened_zero_armor:
 		return false
+	if buster_equipped():
+		return true
 	return air_charges() > 0
 
 func can_take_input() -> bool:
@@ -335,7 +344,7 @@ func _Setup() -> void :
 		effect_emit("youdantotsu_awaken")
 
 	horizontal_speed = start_speed
-	if not character.is_on_floor():
+	if not character.is_on_floor() and costs_air_resource():
 		spend_air_charge()
 	update_bonus_horizontal_only_conveyor()
 	set_saber_animations()

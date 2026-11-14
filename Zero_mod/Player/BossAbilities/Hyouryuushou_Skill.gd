@@ -184,6 +184,13 @@ func spend_air_charge() -> void:
 	if airjump != null:
 		airjump.reduce_air_jumps(1)
 
+func buster_equipped() -> bool:
+	return character.saber_node.current_weapon.name == "Z-Breaker"
+
+func costs_air_resource() -> bool:
+	# 手炮版的冰龙升只是放一颗 Drift Diamond，不带自己的位移，不该占空中资源
+	return not buster_equipped()
+
 # ==== 空中起手用的上升曲线（参数见文件头部） ====
 
 func attack_is_held() -> bool:
@@ -234,7 +241,7 @@ func process_air_jump_ascent(delta: float) -> void:
 func _StartCondition() -> bool:
 	if not character.Hyouryuushou:
 		return false
-	if not character.is_on_floor() and air_charges() <= 0:
+	if not character.is_on_floor() and costs_air_resource() and air_charges() <= 0:
 		return false
 	if not character.get_action_pressed("move_up"):
 		return false
@@ -270,7 +277,7 @@ func _Setup() -> void :
 	set_saber_animations()
 	jumped = false
 	descend = false
-	if not character.is_on_floor():
+	if not character.is_on_floor() and costs_air_resource():
 		spend_air_charge()
 	character.dashjumps_since_jump = 0
 

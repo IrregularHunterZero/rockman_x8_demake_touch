@@ -67,6 +67,9 @@ func is_recharge_blocked() -> bool:
 		return false
 	for move in character.executing_moves:
 		if move.name in recharge_blocking_moves:
+			# 不消耗空中资源的变招（手炮版冰龙升 / 叶断突）连回充都不该冻结
+			if move.has_method("costs_air_resource") and not move.costs_air_resource():
+				continue
 			return true
 	return false
 
