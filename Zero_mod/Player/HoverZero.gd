@@ -4,10 +4,14 @@ class_name HoverZero
 # 白 Axl（Floppa Axl）的悬停逻辑移植到觉醒 Zero。
 #
 # 进入：空中按住"下"再按跳键（下+跳），会打断当前的跳跃直接进入悬停。
-# 退出：松开跳键、落地、贴墙、或按冲刺。
+# 退出：松开跳键、落地、贴墙、或接上空中冲刺。
+# 允许的派生：
+#   - 冲刺键按下 -> 空中冲刺照常启动，悬停当场结束，之后和悬停无关。
+#   - 装了手炮（Z-Buster / 节点名 Z-Breaker）时按攻击 -> 手炮普通攻击照常发射，
+#     悬停不中断，攻击动作播完自动回到悬停循环（跳跃键没松就一直悬着）。
+#   其余攻击仍然派生不出来（悬停是高优先级）。
 # 资源：悬停不消耗 AirJump 的空中资源，空中冲刺也与它无关；
 #       但悬停期间空中资源不恢复（DoubleJumpZero.recharge_blocking_moves 里有 "HoverZero"）。
-# 限制：悬停期间 is_high_priority() 生效，任何攻击动作都派生不出来。
 # 动画：awaken_beam —— 6 帧 80x160 的循环，和 Boss Zero 的 awakened_ready_loop
 #       用的是同一张贴图（res://Zero_mod/X8/Player/Genmuzero/awakened_loop.png）。
 # 注意：节点名不能叫 "Hover"——Character.max_out_air_abilities() 会去给名为
@@ -24,7 +28,22 @@ func should_execute_on_hold() -> bool:
 	return true
 
 func is_high_priority() -> bool:
+	# 上面两个允许的派生需要在同一帧启动（框架先判"能不能启动"，再判"要不要结束"），
+	# 所以按下对应按键的这段时间先让出高优先级；结束判定在 _EndCondition 里做。
+	if character.get_action_pressed("dash"):
+		return false
+	if character.get_action_pressed("fire") and buster_equipped():
+		return false
 	return true
+
+func buster_equipped() -> bool:
+	var shot_node = character.get_node_or_null("Shot")
+	if shot_node == null:
+		return false
+	var weapon = shot_node.get("current_weapon")
+	if weapon == null:
+		return false
+	return weapon.name == "Z-Breaker"
 
 func _StartCondition() -> bool:
 	if requires_awakened_armor and not CharacterManager.awakened_zero_armor:
@@ -37,11 +56,21 @@ func _StartCondition() -> bool:
 		return false
 	if not character.get_action_just_pressed("jump"):
 		return false
+	if character.get_animation() in character.saber_animations:
+		return false
 	if pressing_towards_wall():
 		return false
 	return true
 
+func stop_running_jumps() -> void:
+	# 下+跳要能直接打断跳跃。悬停在某些帧会让出高优先级（按着手炮/冲刺时），
+	# 那种情况下 StopAnyConflictingMoves 不会替我们结束跳跃，所以这里点名收掉。
+	for ability_name in ["Jump", "DashJump", "AirJump", "WallJump", "DashWallJump"]:
+		if character.is_executing(ability_name):
+			character.force_end(ability_name)
+
 func _Setup() -> void:
+	stop_running_jumps()
 	down_armed = false
 	if hover_animation != "":
 		character.play_animation(hover_animation)
@@ -63,6 +92,23 @@ func _Update(_delta: float) -> void:
 	else:
 		down_armed = true
 		character.set_vertical_speed(0)
+	refresh_hover_animation()
+
+func is_saber_attack_executing() -> bool:
+	for move in character.executing_moves:
+		if move.name == "SaberCombo" or move.name == "SaberJump" or move.name == "SaberDash" or move.name == "SaberWall":
+			return true
+	return false
+
+func refresh_hover_animation() -> void:
+	if hover_animation == "":
+		return
+	# 手炮的攻击动作还在播的时候别抢动画，播完再回到悬停循环
+	# （不能只看当前动画名：saber_jump 本身就是 saber_animations 里的一员）
+	if is_saber_attack_executing():
+		return
+	if character.get_animation() != hover_animation:
+		character.play_animation(hover_animation)
 
 func _EndCondition() -> bool:
 	if character.is_on_floor():
@@ -71,14 +117,17 @@ func _EndCondition() -> bool:
 		return true
 	if actions.size() > 0 and not character.get_action_pressed(actions[0]):
 		return true
-	# 冲刺键按下就放手，让下一帧的空中冲刺能接上
-	if character.get_action_pressed("dash"):
+	# 空中冲刺真的起来了才结束悬停；没有跳数、冲不出去时继续悬着
+	if character.is_executing("AirDash"):
 		return true
 	return false
 
 func _Interrupt() -> void:
 	._Interrupt()
 	character.set_vertical_speed(0)
+	# 交给空中冲刺/手炮动作的话就别覆盖它们的动画
+	if character.is_executing("AirDash") or is_saber_attack_executing():
+		return
 	if character.is_on_floor():
 		character.play_animation("idle")
 	else:
