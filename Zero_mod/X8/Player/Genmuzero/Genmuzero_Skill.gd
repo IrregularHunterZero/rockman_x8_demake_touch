@@ -41,6 +41,9 @@ var genmu_ready_played: bool = false
 var genmu_wave_played: bool = false
 var checkmate: bool = false
 var not_hide: bool = false
+# 幻梦零专属的"续杯"：动作结束时如果大招键还按着，就在下一帧直接接上第二发。
+# 只在这个动作自然结束的那一刻判定一次，不做"按住等量表"的长期排队。
+var chain_requested: bool = false
 
 func _ready() -> void :
 	Event.listen("boss_health_appear",self,"boss_fight_to_long_time")
@@ -195,12 +198,22 @@ func _StartCondition() -> bool:
 		return false
 	if animatedSprite.animation == "charge_sentsuizan":
 		return false
-	if character.get_action_pressed("select_special"):
+	if character.get_action_pressed("select_special") or character.buffered_special("select_special"):
 		return true
 	return false
 
 func _ResetCondition() -> bool:
 	return false
+
+# 续杯时没有新的"按下"边沿，由这里放行；普通起手仍走基类的输入判定。
+func Should_Execute() -> bool:
+	if chain_requested:
+		if active and character.get_action_pressed("select_special") and not conflicting_abilities():
+			action = "select_special"
+			input = get_action_value()
+			return true
+		chain_requested = false
+	return .Should_Execute()
 
 # Desperation owns "up + special" whenever it is actually able to fire,
 # on the ground or in the air. Keeps both abilities from fighting over the input.
@@ -214,18 +227,27 @@ func desperation_has_priority() -> bool:
 
 func _EndCondition() -> bool:
 	if end_state():
+		# 续杯判定：按键还按着、且这次起手合法，就记一次请求交给下一帧的 try_execution。
+		# 不在 EndAbility 流程里直接 ExecuteOnce，避免在 executing_moves 里重入。
+		chain_requested = character.get_action_pressed("select_special") and _StartCondition()
 		return true
 	if not animatedSprite.animation == "genmuzero" and not animatedSprite.animation == "genmuzeroair":
 		return true
 	return false
 
 func _Setup() -> void :
+	chain_requested = false
 	genmu_ready_played = false
 	genmu_wave_played = false
 	if character.is_on_floor():
 		animatedSprite.animation = "genmuzero"
 	else:
 		animatedSprite.animation = "genmuzeroair"
+	# 续杯时动画名仍然是 "genmuzero"/"genmuzeroair"，只赋同名 animation 不会复位帧；
+	# 不复位的话第二发会从第 19 帧（收剑段）起手，立刻满足结束条件 → 空转，
+	# 表现就是卡在收剑动作上、过一会儿才放出下一发。这里强制从头播。
+	animatedSprite.frame = 0
+	animatedSprite.playing = true
 
 func _Update(_delta: float) -> void :
 	update_bonus_horizontal_only_conveyor()
@@ -254,7 +276,12 @@ func change_animation_if_falling(_s) -> void :
 func _Interrupt() -> void :
 	._Interrupt()
 	character.can_eject = true
-	character.remove_invulnerability("Genmuzero")
+	# 续杯时保留无敌：EndAbility 到下一发 _Update 之间有一帧空档，被摸到就会断链。
+	# 由 confirm_chain_invulnerability 兜底：续杯没接上就把无敌补摘掉。
+	if chain_requested:
+		Tools.timer(0.1, "confirm_chain_invulnerability", self)
+	else:
+		character.remove_invulnerability("Genmuzero")
 	if is_instance_valid(current_hitbox):
 		current_hitbox.queue_free()
 	awakenaura.speed_scale = 1
@@ -266,3 +293,8 @@ func _Interrupt() -> void :
 		awakenaura.show()
 	if CharacterManager.betazero_activated and CharacterManager.extra_saber_color:
 		awakenaura.hide()
+
+func confirm_chain_invulnerability() -> void:
+	if not executing:
+		chain_requested = false
+		character.remove_invulnerability("Genmuzero")

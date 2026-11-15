@@ -99,7 +99,7 @@ func _StartCondition() -> bool:
 		return false
 	if not character.get_action_pressed("move_up"):
 		return false
-	if character.get_action_pressed("select_special"):
+	if character.get_action_pressed("select_special") or character.buffered_special("select_special"):
 		return true
 	return false
 

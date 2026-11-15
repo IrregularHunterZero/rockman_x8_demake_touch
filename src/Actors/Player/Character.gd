@@ -115,6 +115,7 @@ func _physics_process(delta: float) -> void :
 		var actual_delta = delta
 		tick_walljump_commit(delta)
 		tick_dash_hold(delta)
+		tick_special_buffer()
 		last_hit_time += delta
 		if time_stop_active:
 			last_hit_time += GameManager.true_delta
@@ -366,6 +367,29 @@ func dash_hold_available() -> bool:
 
 func consume_dash_hold() -> void:
 	dash_hold_consumed = true
+
+# —— 大招键输入缓冲 ——
+# 0.2s 内按下的 alt_fire / select_special 会被记住：按的时候如果所有大招都起不来，
+# 等其中某个条件成立时立刻消费掉这次按键；用掉即清，不会重复触发。
+const special_buffer_time: float = 0.2
+const special_buffer_actions = ["alt_fire", "select_special"]
+var special_press_ms: Dictionary = {}
+
+func tick_special_buffer() -> void:
+	for action in special_buffer_actions:
+		if get_action_just_pressed(action):
+			special_press_ms[action] = OS.get_ticks_msec()
+
+func buffered_special(action: String = "alt_fire") -> bool:
+	if not special_press_ms.has(action):
+		return false
+	if OS.get_ticks_msec() - special_press_ms[action] > int(special_buffer_time * 1000):
+		special_press_ms.erase(action)
+		return false
+	return true
+
+func consume_buffered_special(action: String = "alt_fire") -> void:
+	special_press_ms.erase(action)
 
 # 冲刺 → 特殊 的组合命令判定：特殊键必须在冲刺按下后 100ms 内按下。
 func dash_special_chord_active() -> bool:

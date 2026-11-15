@@ -30,9 +30,20 @@ func should_execute_on_hold() -> bool:
 
 func Initialize() -> void :
 	.Initialize()
+	# 大招键的输入缓冲：这一招确实起手了才消费那块缓冲，被冲突挡掉时留给下一招。
+	if action in ["alt_fire", "select_special"] and character != null and character.has_method("consume_buffered_special"):
+		character.consume_buffered_special(action)
 	play_sound_on_initialize()
 	play_animation_on_initialize()
 	adjust_shot_position_on_initialize()
+
+# 特殊攻击键的缓冲：按下的缓冲窗口内都算"刚按下"，由 Character 统一管理。
+func is_buffered_special_press(element: String) -> bool:
+	if element != "alt_fire" and element != "select_special":
+		return false
+	if character == null or not character.has_method("buffered_special"):
+		return false
+	return character.buffered_special(element)
 
 func Finalize() -> void :
 	has_let_go_of_input = false
@@ -84,7 +95,7 @@ func check_all_actions_for_input() -> bool:
 		return true
 	if not should_execute_on_hold():
 		for element in actions:
-			if get_action_just_pressed(element):
+			if get_action_just_pressed(element) or is_buffered_special_press(element):
 				action = element
 				return true
 	else:
