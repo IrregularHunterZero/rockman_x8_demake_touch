@@ -14,6 +14,9 @@ var interval: float = 0.064
 var mid_animation_time: float = 0.12
 var end_animation_time: float = 1.45
 var deflectable: bool = false
+# 为 true 时无视受击后的短暂无敌，每一段（每个 tick）都独立结算。
+# 默认 false：X 的蓄力光盾照旧；天照霸的激光生成时会把它打开。
+var ignore_hit_invulnerability: bool = false
 
 
 func _DamageTarget(body) -> int:

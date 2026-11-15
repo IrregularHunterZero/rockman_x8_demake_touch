@@ -149,11 +149,15 @@ func change_animation_if_falling(_s) -> void :
 
 func _Interrupt() -> void :
 	._Interrupt()
+	# 动作结束：解除无敌（弹幕还在，但人不再无敌）
+	character.remove_invulnerability("Rekuhouha")
 	if is_instance_valid(effect):
 		effect.queue_free()
 		effect = null
 
 func fire_laser() -> void :
+	# 弹幕开始产生的那一刻才进无敌，动作起手阶段不无敌（与天照霸同一套规则）
+	character.add_invulnerability("Rekuhouha")
 	last_position = character.global_position
 	rekohouhaground_sound.play()
 	summon_rekohouha()
@@ -193,6 +197,8 @@ func create_rekohouha(ground_position) -> void :
 
 func create_rekohouhaground(ground_position) -> void :
 	var instance = rekohouhaground.instance()
+	# 每一发地面光波都独立结算（否则前几发会把目标的受击无敌打出来、后面全吞）
+	instance.ignore_hit_invulnerability = true
 	ground_position.y += -25
 	get_tree().current_scene.get_node("Objects").call_deferred("add_child", instance, true)
 	instance.set_global_position(ground_position)

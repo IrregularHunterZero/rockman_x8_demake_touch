@@ -163,7 +163,9 @@ func activate() -> void :
 		$"../area2D/collisionShape2D".call_deferred("set_disabled", false)
 
 func should_ignore_damage(inflicter) -> bool:
-	if character.is_invulnerable() or not character.has_health():
+	# 同 EnemyDamage：带 ignore_hit_invulnerability 的投射物（天照霸/烈光霸的多段弹幕）无视受击无敌
+	var ignores_iframes: bool = character.has_health() and "ignore_hit_invulnerability" in inflicter and inflicter.ignore_hit_invulnerability
+	if (character.is_invulnerable() or not character.has_health()) and not ignores_iframes:
 		if not bypass_hit_invulnerable:
 			return true
 		elif "bypass_shield" in inflicter:

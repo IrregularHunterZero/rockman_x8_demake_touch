@@ -109,7 +109,10 @@ func should_be_damaged(inflicter) -> bool:
 
 func should_ignore_damage(inflicter) -> bool:
 	if is_instance_valid(inflicter):
-		if character.is_invulnerable() or not character.has_health():
+		# 声明了 ignore_hit_invulnerability 的投射物：每一段都独立结算，无视受击后的短暂无敌
+		# （天照霸的激光、烈光霸的光波这类"多段弹幕"用；普通子弹不带这个标记，行为不变）
+		var ignores_iframes: bool = character.has_health() and "ignore_hit_invulnerability" in inflicter and inflicter.ignore_hit_invulnerability
+		if (character.is_invulnerable() or not character.has_health()) and not ignores_iframes:
 			if not bypass_hit_invulnerable:
 				return true
 			elif "bypass_shield" in inflicter:

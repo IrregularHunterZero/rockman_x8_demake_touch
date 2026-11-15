@@ -1,6 +1,8 @@
 extends SimplePlayerProjectile
 
 const bypass_shield: = true
+# 每一发光波都独立结算：无视受击后的短暂无敌（烈光霸/灭闪光的弹幕）
+const ignore_hit_invulnerability: bool = true
 var rekohouha: bool = true
 
 func _Update(delta: float) -> void :

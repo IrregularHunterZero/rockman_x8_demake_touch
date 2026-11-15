@@ -315,6 +315,7 @@ func create_laser(ground_position) -> void :
 	instance.mid_animation_time = 0.12
 	instance.end_animation_time = 1.45
 	instance.deflectable = true
+	instance.ignore_hit_invulnerability = true
 	instance.damage = 3
 	instance.damage_to_bosses = 1.5
 	instance.damage_to_weakness = 25
@@ -332,6 +333,7 @@ func create_lasershort(ground_position) -> void :
 	instance.mid_animation_time = 0.12
 	instance.end_animation_time = 0.36
 	instance.deflectable = true
+	instance.ignore_hit_invulnerability = true
 	instance.damage = 6
 	instance.damage_to_bosses = 3
 	instance.damage_to_weakness = 30

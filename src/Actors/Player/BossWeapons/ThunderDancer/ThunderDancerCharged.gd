@@ -1,6 +1,8 @@
 extends SimplePlayerProjectile
 onready var flash: AnimatedSprite = $flash
 var enabled_damage: = false
+# 为 true 时无视受击后的短暂无敌（烈光霸的地面光波会打开它；X 的雷舞者照旧）
+var ignore_hit_invulnerability: bool = false
 
 func _ready() -> void :
 	disable_damage()
