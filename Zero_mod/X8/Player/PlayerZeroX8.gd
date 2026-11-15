@@ -323,7 +323,9 @@ func set_charge_full_time(full_time: float) -> void :
 	if charge == null:
 		return
 	var factor: float = full_time / charge_ladder_full_time
-	charge.minimum_charge_time = 1.0 * factor
+	# L1（开始进蓄力、也就是千子斩的起手）统一 0.5s，不跟着 full_time 缩放：
+	# 按久一点就串成别的招的观感比"各形态蓄力节奏不同"更糟，先按住这一条。
+	charge.minimum_charge_time = 0.5
 	charge.level_3_charge = 3.0 * factor
 	charge.level_4_charge = full_time
 

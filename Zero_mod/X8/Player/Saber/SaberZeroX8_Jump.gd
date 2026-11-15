@@ -460,7 +460,9 @@ func set_saber_animations() -> void :
 				saber_sound_counter = 0
 
 func create() -> void :
-	can_use = false
+	# 全功率觉醒 Zero：圆舞斩的后续每一段也放剑气，所以不消费 can_use
+	# （空中原本 create() 一次就把 can_use 关掉，要等落地/贴墙才恢复，等于只有第一段有剑气）。
+	can_use = CharacterManager.awakened_zero_armor and CharacterManager.awakened_zero_full_power_max
 	first_time_use = false
 	last_direction = character.get_facing_direction()
 	animatedSprite.animation = "saber_ensuizan"
@@ -608,9 +610,10 @@ func _Update(_delta: float) -> void :
 		set_movement_no_direction(0)
 		update_bonus_horizontal_only_conveyor()
 	
-	if animatedSprite.animation == "saber_ensuizan" and not first_time_use:
-		set_horizontal_speed(0)
-		set_vertical_speed(0)
+	# 觉醒 Zero 的空中上斩第一段（saber_ensuizan + 剑气）不再把人钉在空中：
+	# 原来这里在 first_time_use == false 的那 0.24s 里把水平/垂直速度清零，
+	# 表现就是第一段停住、后面几段才跟着跳移动。现在整段都按普通空中攻击走。
+
 
 func change_animation_if_falling(_s) -> void :
 	animatedSprite.animation = "fall"
