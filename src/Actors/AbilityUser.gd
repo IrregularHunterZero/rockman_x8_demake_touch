@@ -51,8 +51,18 @@ func start_executing_moves() -> void :
 
 func try_execution(move: BaseAbility, _logs: = false) -> void :
 	if move.active and not move.executing:
-		if move._StartCondition() and move.Should_Execute():
+		var can_start: bool = move._StartCondition()
+		if can_start and move.Should_Execute():
+			# 拒绝窗口测量（诊断，见 Character.debug_report_refusal）
+			if has_method("debug_report_refusal"):
+				call("debug_report_refusal", move, "started")
 			move.ExecuteOnce()
+		elif can_start:
+			# 状态已经合法、只是这次没按：窗口到此为止
+			if has_method("debug_report_refusal"):
+				call("debug_report_refusal", move, "opened")
+		elif has_method("debug_track_refusal"):
+			call("debug_track_refusal", move)
 
 func process_executing_moves(delta: float) -> void :
 	# 副本遍历：EndAbility 会在循环里改 executing_moves，顺便把两类坏条目清掉：

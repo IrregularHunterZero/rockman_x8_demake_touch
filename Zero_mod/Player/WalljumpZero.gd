@@ -30,6 +30,10 @@ func _Setup() -> void :
 	emitted_jump_signal = false
 	character.emit_signal("walljump")
 	walljump_direction = - wall_side_for_jump()
+	# 起跳瞬间把这次"按住"消费掉：攀墙时一直按着冲刺，踢出去之后不该自己冲出来。
+	# 想冲就在起跳之后重新按（新按下 = 新周期）。
+	if character.has_method("consume_dash_hold"):
+		character.consume_dash_hold()
 	# 踢墙动作播完之前不接受方向键/冲刺：否则动画还在踢墙，人已经能转身走了。
 	character.start_walljump_commit(commit_time())
 	# 朝向不在这里硬定：踢墙那一下已经在离墙了，朝向交还给玩家

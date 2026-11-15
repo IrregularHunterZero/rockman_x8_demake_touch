@@ -27,6 +27,9 @@ func get_activation_leeway_time() -> float:
 	return leeway
 
 func _Setup() -> void :
+	# 冲刺一旦起手就把"本次按住"消费掉：按住不放不会在离地/离墙时反复起冲。
+	if character.has_method("consume_dash_hold"):
+		character.consume_dash_hold()
 	Event.emit_signal("dash")
 	set_direction(get_pressed_direction())
 	update_bonus_horizontal_only_conveyor()

@@ -321,6 +321,11 @@ func _StartCondition() -> bool:
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false
+	# 冲刺 + 特殊（特殊键在冲刺按下后 100ms 内）算组合命令：
+	# 即使冲刺被踢墙窗口/贴墙挡住、还没真正起手，也直接出雷光闪（它的收招稳定，打断踢墙不鬼畜）。
+	if character.has_method("dash_special_chord_active") and character.dash_special_chord_active():
+		if character.get_action_pressed("dash") and not character.is_on_floor():
+			return not executing
 	if not executing:
 		if _animation == "dash":
 			return true

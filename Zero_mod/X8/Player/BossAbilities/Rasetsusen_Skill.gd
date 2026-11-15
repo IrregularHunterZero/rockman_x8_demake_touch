@@ -309,6 +309,12 @@ func process_air_jump_ascent(delta: float) -> void:
 func _StartCondition() -> bool:
 	if not character.Rasetsusen:
 		return false
+	# 冲刺 + 特殊（冲刺按下后 100ms 内按特殊）是雷光闪的组合命令：
+	# 罗刹旋在这里让路，否则被打断后永远只能接出罗刹旋。
+	# 只在"雷光闪真的可用"时让路，否则没解锁技能的人会两边都放不出。
+	if character.has_method("dash_special_chord_active") and character.dash_special_chord_active():
+		if character.get_action_pressed("dash") and character.Raikousen:
+			return false
 	# 悬停时"特殊攻击无方向"走的是地面上的十文字斩，空中的罗刹旋让路
 	if character.is_executing("HoverZero"):
 		return false

@@ -114,6 +114,7 @@ func _physics_process(delta: float) -> void :
 	if is_current_player:
 		var actual_delta = delta
 		tick_walljump_commit(delta)
+		tick_dash_hold(delta)
 		last_hit_time += delta
 		if time_stop_active:
 			last_hit_time += GameManager.true_delta
@@ -251,6 +252,38 @@ func debug_dump_ability_log() -> void:
 	print("[ZERO-LOG] ", PoolStringArray(debug_ability_log).join(" | "))
 	debug_ability_log.clear()
 
+# —— 拒绝窗口测量 ——
+# 动作键按着、但招式起不来 → 记下时刻；等这招真的起来时打印等了多久。
+# 这个差值就是玩家感受到的"不能动"时间（用来填 state-machine.md 的待测项）。
+const debug_refusal_actions = [ "dash", "fire", "alt_fire", "jump" ]
+const debug_refusal_min_ms = 50
+var debug_refused_moves: Dictionary = {}
+
+func debug_track_refusal(move) -> void:
+	if not debug_tracking_enabled():
+		return
+	var actions = move.get("actions")
+	if actions == null:
+		return
+	var held: bool = false
+	for action in actions:
+		if action in debug_refusal_actions and get_action_pressed(action):
+			held = true
+			break
+	if not held:
+		debug_refused_moves.erase(move.name)
+		return
+	if not debug_refused_moves.has(move.name):
+		debug_refused_moves[move.name] = OS.get_ticks_msec()
+
+func debug_report_refusal(move, reason: String = "started") -> void:
+	if not debug_refused_moves.has(move.name):
+		return
+	var waited: int = OS.get_ticks_msec() - int(debug_refused_moves[move.name])
+	debug_refused_moves.erase(move.name)
+	if waited >= debug_refusal_min_ms:
+		print("[REFUSE] ", move.name, " waited ", waited, " ms (", reason, ")")
+
 # —— 踢墙跳起跳锁定 ——
 # 起跳动画没播完之前：左右方向键一律当没按（不改朝向、不改位移），冲刺也不转成空中冲刺。
 # 预输入整个先撤掉了（缓冲/补放都去掉）——方案待定，这段只做"挡"。
@@ -291,6 +324,54 @@ func ability_started(ability) -> void:
 		if action in walljump_commit_cancel_actions:
 			end_walljump_commit()
 			return
+
+# —— 冲刺的"按住采样" ——
+# 冲刺是按住型输入：不排队重放，只在第一个合法帧看它是不是还按着。
+# "一次按住"从按下那一刻算起：
+#   - 新按下 = 新周期（清掉消费标记），最长有效 0.4s（按太久就作废，避免"按着不放过一会儿自己冲"）
+#   - 起手时消费本周期，按住不放不会连冲
+#   - 松开后保留 66ms 容差
+# 另外"冲刺按下后 100ms 内按特殊"算组合命令（雷光闪），见 dash_special_chord_active()。
+const dash_hold_grace_time: float = 0.066
+const dash_hold_max_age: float = 0.4
+const dash_special_chord_time: float = 0.1
+var dash_hold_grace: float = 0.0
+var dash_hold_consumed: bool = false
+var dash_hold_started_ms: int = 0
+var dash_was_pressed: bool = false
+
+func tick_dash_hold(delta: float) -> void:
+	# 特殊键按下（无论这一下有没有被当前招式接受）都把冲刺意图清掉：
+	# "冲刺→特殊"是一条命令，special 已经被用掉，这次按住不该再漏到招式结束后自己冲出来。
+	if get_action_just_pressed("alt_fire"):
+		dash_hold_consumed = true
+	var pressed: bool = get_action_pressed("dash")
+	if pressed and not dash_was_pressed:
+		dash_hold_consumed = false
+		dash_hold_started_ms = OS.get_ticks_msec()
+	dash_was_pressed = pressed
+	if pressed:
+		dash_hold_grace = dash_hold_grace_time
+		return
+	dash_hold_grace = max(0.0, dash_hold_grace - delta)
+	if dash_hold_grace <= 0.0:
+		dash_hold_consumed = false
+
+func dash_hold_available() -> bool:
+	if dash_hold_consumed or dash_hold_grace <= 0.0:
+		return false
+	if dash_hold_started_ms > 0 and OS.get_ticks_msec() - dash_hold_started_ms > int(dash_hold_max_age * 1000):
+		return false
+	return true
+
+func consume_dash_hold() -> void:
+	dash_hold_consumed = true
+
+# 冲刺 → 特殊 的组合命令判定：特殊键必须在冲刺按下后 100ms 内按下。
+func dash_special_chord_active() -> bool:
+	if dash_hold_started_ms <= 0:
+		return false
+	return OS.get_ticks_msec() - dash_hold_started_ms <= int(dash_special_chord_time * 1000)
 
 # 锁定期内只维持贴图朝向，不改 direction（位移仍按锁定前那一刻的输入走）。
 func update_facing_direction():

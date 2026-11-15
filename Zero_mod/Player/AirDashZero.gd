@@ -59,6 +59,28 @@ func should_dash() -> bool:
 				if not facing_a_wall():
 					return true
 	return false
+
+# 冲刺是按住型输入：不用 just_pressed，改成"按住且本周期还没消费"。
+# 这样被踢墙窗口/贴墙拒掉的冲刺，只要玩家还按着，条件一开就会起冲（hold 采样，不重放）。
+# 起手时由 DashZero._Setup 消费本周期，所以按住不放不会连冲。
+func Should_Execute() -> bool:
+	if not active:
+		return false
+	if character.has_method("dash_hold_available"):
+		if not character.dash_hold_available():
+			return false
+		# 同一帧里按了特殊：这条冲刺意图归"冲刺→特殊"命令，不单独起冲，
+		# 而且要被消费掉（否则会在当前招式结束后漏出来）。
+		if character.get_action_just_pressed("alt_fire"):
+			character.consume_dash_hold()
+			return false
+	elif not get_action_just_pressed(actions[0]):
+		return false
+	if conflicting_abilities():
+		return false
+	action = actions[0]
+	input = get_action_value()
+	return true
 	
 func change_animation_if_falling(_s) -> void :
 	EndAbility()
