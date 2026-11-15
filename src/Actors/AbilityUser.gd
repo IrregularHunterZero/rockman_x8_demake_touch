@@ -29,6 +29,11 @@ func update_moveset():
 		if should_add_to_start_moveset(child):
 			moveset.append(child)
 			child.connect("ability_end", self, "ability_ended")
+			child.connect("ability_start", self, "ability_started")
+
+# 招式起手的钩子，派生类（Character）用它做"攻击解除踢墙锁定"之类的事。
+func ability_started(_ability) -> void:
+	pass
 
 func should_add_to_start_moveset(element) -> bool:
 	if element is BaseAbility:

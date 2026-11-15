@@ -252,14 +252,16 @@ func debug_dump_ability_log() -> void:
 	debug_ability_log.clear()
 
 # —— 踢墙跳起跳锁定 ——
-# 起跳动画没播完之前：左右方向键一律当没按（不改朝向、不改位移），
-# 冲刺也不转成空中冲刺；窗口结束时如果冲刺键还按着，就把这一下补放出来。
+# 起跳动画没播完之前：左右方向键一律当没按（不改朝向、不改位移），冲刺也不转成空中冲刺。
+# 预输入整个先撤掉了（缓冲/补放都去掉）——方案待定，这段只做"挡"。
+# 攻击是例外：攻击一出手就解除锁定（见 ability_started），因为它自带动画和位移。
 var walljump_commit_timer: float = 0.0
-var walljump_dash_buffered: bool = false
+
+# 这些输入起手的招式算"攻击"，起手即解除踢墙锁定。
+const walljump_commit_cancel_actions = [ "fire", "alt_fire", "select_special" ]
 
 func start_walljump_commit(seconds: float) -> void:
 	walljump_commit_timer = max(walljump_commit_timer, seconds)
-	walljump_dash_buffered = false
 
 func tick_walljump_commit(delta: float) -> void:
 	if walljump_commit_timer <= 0.0:
@@ -267,19 +269,28 @@ func tick_walljump_commit(delta: float) -> void:
 	walljump_commit_timer -= delta
 	if walljump_commit_timer <= 0.0:
 		walljump_commit_timer = 0.0
-		consume_buffered_walljump_dash()
 
-func consume_buffered_walljump_dash() -> void:
-	if not walljump_dash_buffered:
+# 提前解锁：把朝向按当前输入重算一次，别让紧接着的招用到上一帧的旧朝向。
+func end_walljump_commit() -> void:
+	if walljump_commit_timer <= 0.0:
 		return
-	walljump_dash_buffered = false
-	if not get_action_pressed("dash"):
+	walljump_commit_timer = 0.0
+	var pressed: int = get_pressed_axis()
+	if pressed != 0:
+		set_direction(pressed, true)
+	else:
+		set_direction(get_facing_direction(), true)
+
+func ability_started(ability) -> void:
+	if walljump_commit_timer <= 0.0:
 		return
-	var air_dash = get_ability("AirDash")
-	if air_dash == null or not air_dash.active or air_dash.executing:
+	var actions = ability.get("actions")
+	if actions == null:
 		return
-	if air_dash._StartCondition():
-		air_dash.ExecuteOnce()
+	for action in actions:
+		if action in walljump_commit_cancel_actions:
+			end_walljump_commit()
+			return
 
 # 锁定期内只维持贴图朝向，不改 direction（位移仍按锁定前那一刻的输入走）。
 func update_facing_direction():
@@ -480,14 +491,18 @@ func is_colliding_with_wall() -> int:
 			return - 1
 	return 0
 
-# 当前操作算不算"攀墙"：人在空中、身体还贴着墙（短射线），且正朝墙按方向键。
-# 只看物理接触，不看招式名——踢墙之后 WallSlide/SaberWall 可能还挂在 executing 里，
+# 当前操作算不算"攀墙"：人在空中、身体还贴着墙（短射线），正朝墙按方向键，
+# 而且不是"正在往上窜"——上升期蹭到墙不算挂上（WallSlide 本来就要求 v > 0 才起手，
+# 这里不要求的话，从地面起跳朝墙放蓄力斩会莫名其妙进入攀墙分支、刀砍在墙上）。
+# 只看物理接触 + 速度，不看招式名——踢墙之后 WallSlide/SaberWall 可能还挂在 executing 里，
 # 用它们判会把"已经离墙"误判成攀墙，表现为凭空踢墙、攻击方向反着来。
 func is_clinging_to_wall() -> bool:
 	if is_on_floor():
 		return false
 	var wall = is_colliding_with_wall()
 	if wall == 0:
+		return false
+	if get_vertical_speed() < 0.0:
 		return false
 	return get_pressed_axis() == wall
 

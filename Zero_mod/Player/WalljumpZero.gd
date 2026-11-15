@@ -60,10 +60,8 @@ func _Update(delta: float) -> void :
 					set_fall_animation()
 
 func execute_dashwalljump_on_input() -> bool:
-	# 锁定窗口里的冲刺记下来，窗口一结束再补放（预输入），不要当场吞掉也不要当场转化。
+	# 起跳锁定窗口内不给冲刺，也不做预输入（缓冲方案待定，这里先纯挡掉）。
 	if character.walljump_commit_timer > 0.0:
-		if Input.is_action_just_pressed(dash_action):
-			character.walljump_dash_buffered = true
 		return false
 	# 0.25 秒缓冲窗口内按冲刺 = 冲刺踢墙跳。但前提是人还真的贴着墙：
 	# 原来不看贴墙，踢墙后这个窗口里想按空中冲刺也会被吞成冲刺踢墙跳。
