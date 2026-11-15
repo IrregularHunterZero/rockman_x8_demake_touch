@@ -297,6 +297,9 @@ func can_take_input() -> bool:
 func _StartCondition() -> bool:
 	if not can_take_input():
 		return false
+	# 攀墙时朝墙按方向键 + alt_fire 就是叶断突的触发，会从墙上蹬出去，没道理
+	if character.is_clinging_to_wall():
+		return false
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false

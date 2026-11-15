@@ -209,7 +209,9 @@ func start() -> void :
 	if start_emit_event != "none":
 		Event.emit_signal(start_emit_event)
 	if has_node("Menu/scrollContainer/OptionHolder/ShowDebug"):
-		$"Menu/scrollContainer/OptionHolder/ShowDebug".visible = GameManager.debug_enabled
+		# 这一行在 emit_signal("initialize") 之后又把显示状态盖回去了，
+		# 单靠 DebugOption 那个回调在编辑器里也会被压回 false，所以这里要跟着一起放宽。
+		$"Menu/scrollContainer/OptionHolder/ShowDebug".visible = GameManager.debug_enabled or OS.has_feature("editor")
 	fader.visible = true
 	fader.FadeIn()
 	yield(fader, "finished")

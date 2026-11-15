@@ -1138,7 +1138,7 @@ bus = "SFX"
 
 [node name="SaberCharge" type="Node2D" parent="."]
 script = ExtResource( 197 )
-conflicting_moves = [ "WallSlide", "SaberWall", "AirDash" ]
+conflicting_moves = [ "AirDash" ]
 actions = [ "Event" ]
 animation = "charge_saber_jump"
 
@@ -2101,7 +2101,7 @@ fade_out = true
 
 [node name="AirDash" type="Node2D" parent="."]
 script = ExtResource( 19 )
-conflicting_moves = [ "DashWallJump", "WallJump", "WallSlide", "DashJump", "AirDash", "AirJump" ]
+conflicting_moves = [ "WallSlide", "DashJump", "AirDash", "AirJump" ]
 actions = [ "dash" ]
 animation = "dash"
 sound = ExtResource( 6 )

@@ -19,9 +19,17 @@ func _Setup() -> void :
 	character.set_vertical_speed(0)
 
 func _Update(_delta: float) -> void :
-	character.set_horizontal_speed(horizontal_speed * wallgrab_direction)
+	apply_cling_movement(not delay_has_expired())
 	if delay_has_expired():
 		emit_particles(particles, true)
+
+# 攀墙默认位移：水平按抓墙方向推、垂直起手后开始下滑。
+# pinned = true 时定住不下滑（挂在墙上放招的招式用）。
+func apply_cling_movement(pinned: bool = false) -> void :
+	character.set_horizontal_speed(horizontal_speed * wallgrab_direction)
+	if pinned:
+		character.set_vertical_speed(0, false)
+	else:
 		character.set_vertical_speed(jump_velocity)
 
 func _StartCondition() -> bool:

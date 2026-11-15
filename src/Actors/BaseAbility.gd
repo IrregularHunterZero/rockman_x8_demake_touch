@@ -57,10 +57,19 @@ func ExecuteOnce() -> void :
 		_commandList.ExecuteAll()
 
 func Initialize() -> void :
+	# 同一招被重复 ExecuteOnce 时不要重复入表：重复入表后 EndAbility 只摘掉一份，
+	# 剩下的那份 executing=false 却一直留在 executing_moves 里（僵尸条目），
+	# 表现为人物定住、动画停在末帧、别的招式全起不来。
+	if self in character.executing_moves:
+		character.executing_moves.erase(self)
 	executing = true
 	timer = 0
 	last_time_used = get_time()
 	character.executing_moves.append(self)
+	if character != null and character.has_method("debug_log_ability"):
+		character.call("debug_log_ability", "+" + name)
+	if character != null and character.has_method("debug_count_event"):
+		character.call("debug_count_event", "start:" + name)
 	emit_signal("executed")
 
 func get_time() -> int:
@@ -84,6 +93,8 @@ func EndAbility() -> void :
 	Finalize()
 	character.remove_from_executing_list(self)
 	character.enable_floor_snap()
+	if character != null and character.has_method("debug_log_ability"):
+		character.call("debug_log_ability", "-" + name)
 	emit_signal("ability_end", self)
 
 func ResetAbility() -> void :
@@ -205,6 +216,8 @@ func play_sound(audiostream: AudioStream = null, pitch: = true) -> void :
 		if audio.stream == null or audio.stream != audiostream:
 			audio.stream = audiostream
 	audio.play()
+	if character != null and character.has_method("debug_count_event"):
+		character.call("debug_count_event", "sfx")
 
 func stop_sound() -> void :
 	if audio:

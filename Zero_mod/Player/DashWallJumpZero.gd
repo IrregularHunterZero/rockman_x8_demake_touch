@@ -36,7 +36,8 @@ func _StartCondition() -> bool:
 	if character.is_on_floor():
 		return false
 	if character.get_action_pressed(dash_action):
-		if character.is_in_reach_for_walljump() != 0:
+		# 同 WallJump：必须真的贴着墙，别在踢墙后的间隙里凭空起跳
+		if character.is_colliding_with_wall() != 0:
 			return true
 	return false
 
@@ -85,7 +86,8 @@ func _ResetCondition() -> bool:
 			if character.animatedSprite.frame < 5:
 				return false
 		return false
-	if character.is_in_reach_for_walljump() and timer > 0.032:
+	# 同 WallJump：重新起跳要求真的贴着墙，别靠长射线在空中补踢
+	if character.is_colliding_with_wall() != 0 and timer > 0.032:
 		if Input.is_action_just_pressed(actions[0]):
 			character.emit_signal("wallslide")
 			return true

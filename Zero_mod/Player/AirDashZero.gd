@@ -98,13 +98,17 @@ func _StartCondition() -> bool:
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false
+	# 踢墙跳起跳锁定期间不许抢：窗口结束后如果冲刺还按着，Character 会把这一下补放出来。
+	if character.walljump_commit_timer > 0.0:
+		return false
 	if shared_air_charges() <= 0:
 		return false
+	# 贴着墙时不抢这一下：留给冲刺踢墙跳（DashWallJump 自己会起手）。
+	# 原来这里是"踢墙跳后 0.2 秒内一律不许空中冲刺"，等于把那段时间的冲刺吞掉。
+	if character.is_colliding_with_wall() != 0:
+		return false
 	if should_dash():
-		if is_executing_WallJump():
-			return false
-		elif shared_air_charges() > 0:
-			return true
+		return true
 	return false
 
 func is_executing_DashAirJump() -> bool:

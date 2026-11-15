@@ -148,15 +148,15 @@ func initialize(direction) -> void :
 	if resolved != facing_direction:
 		set_direction(resolved)
 
-# 攀墙状态（挂墙 / 贴墙攻击）下无视左右方向键，一律朝离墙一侧出膛：
-# 贴着墙时按方向键必然是朝墙的，照朝向打就成了往墙里开火。
+# 攀墙状态（统一问 Character.is_clinging_to_wall）下无视左右方向键，
+# 一律朝离墙一侧出膛：贴着墙时按方向键必然是朝墙的，照朝向打就成了往墙里开火。
 # 离墙以后一律用人物朝向，这里不再插手。
 func resolve_launch_direction(direction: int) -> int:
 	if not is_instance_valid(spawn_anchor):
 		return direction
-	if not spawn_anchor.has_method("is_executing"):
+	if not spawn_anchor.has_method("is_clinging_to_wall"):
 		return direction
-	if not spawn_anchor.is_executing("WallSlide") and not spawn_anchor.is_executing("SaberWall"):
+	if not spawn_anchor.is_clinging_to_wall():
 		return direction
 	if spawn_anchor.has_method("is_colliding_with_wall"):
 		var wall: int = spawn_anchor.is_colliding_with_wall()

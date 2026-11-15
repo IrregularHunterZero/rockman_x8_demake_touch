@@ -315,6 +315,18 @@ func update_duringimage_color() -> void :
 		duringimage.modulate = initial_color
 		airduringimage.modulate = initial_color
 
+# 蓄力阶梯按"满蓄时间"整体缩放：场景原本是 1.0 / 3.0 / 4.0（初见 / 二级 / 满蓄），
+# 三个档位一起按比例走，保证阶梯单调，满蓄时间就是传进来的那个秒数。
+const charge_ladder_full_time: float = 4.0
+func set_charge_full_time(full_time: float) -> void :
+	var charge = get_node_or_null("Charge")
+	if charge == null:
+		return
+	var factor: float = full_time / charge_ladder_full_time
+	charge.minimum_charge_time = 1.0 * factor
+	charge.level_3_charge = 3.0 * factor
+	charge.level_4_charge = full_time
+
 func equip_zero_parts() -> void :
 	var dash = get_node("Dash")
 	var airdash = get_node("AirDash")
@@ -410,6 +422,8 @@ func equip_zero_parts() -> void :
 	saber_combo.use_shingetsurin = false
 	saber_jump.use_shingetsurin = false
 	saber_wall.use_shingetsurin = false
+	# 普通零：满蓄 3 秒
+	set_charge_full_time(3.0)
 
 func equip_black_zero_parts() -> void :
 	var dash = get_node("Dash")
@@ -607,6 +621,8 @@ func equip_awakened_zero_parts() -> void :
 	saber_combo.use_shingetsurin = true
 	saber_jump.use_shingetsurin = true
 	saber_wall.use_shingetsurin = true
+	# 觉醒零：满蓄 2 秒
+	set_charge_full_time(2.0)
 
 func equip_custom_zero_parts() -> void :
 	var _afterimage = animatedSprite.get_node("afterImages")
@@ -656,7 +672,9 @@ func equip_awakened_zero_up_parts() -> void :
 	saber_combo.use_shingetsurin = true
 	saber_jump.use_shingetsurin = true
 	saber_wall.use_shingetsurin = true
-	
+	# 觉醒零全功率：满蓄 1 秒
+	set_charge_full_time(1.0)
+
 func equip_axl_flameburner_parts() -> void :
 	var dmg_multiplikator = 1.5
 	var desperation = get_node("Desperation")

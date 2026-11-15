@@ -113,6 +113,7 @@ func _process(_delta: float) -> void :
 func _physics_process(delta: float) -> void :
 	if is_current_player:
 		var actual_delta = delta
+		tick_walljump_commit(delta)
 		last_hit_time += delta
 		if time_stop_active:
 			last_hit_time += GameManager.true_delta
@@ -123,9 +124,179 @@ func _physics_process(delta: float) -> void :
 		check_for_low_health()
 		check_for_dash()
 		check_for_char_switch_input()
+		debug_track_stall(actual_delta)
 		if has_control() and IGT.should_run:
 			IGT.in_game_timer += actual_delta
 			IGT.stage_timer += actual_delta
+
+# —— 卡死排查：状态快照 ——
+# 只在对局真正"卡住"时打日志，平时不刷屏：
+#   1) 还有招式在跑、但人在空中几乎静止超过 0.5s；
+#   2) 还有招式在跑、但动画帧超过 0.6s 没动过。
+# 另外 F3 可以手动打一发快照。
+# 开关：GameManager.debug_enabled（设置里的 ShowDebug），编辑器运行时默认算开。
+var debug_still_time: float = 0.0
+var debug_anim_key: String = ""
+var debug_anim_time: float = 0.0
+
+func debug_tracking_enabled() -> bool:
+	return GameManager.debug_enabled or OS.has_feature("editor")
+
+func debug_track_stall(delta: float) -> void:
+	if not debug_tracking_enabled():
+		return
+	debug_track_performance(delta)
+	if Input.is_physical_key_pressed(KEY_F3) and not debug_manual_pressed:
+		debug_manual_pressed = true
+		debug_snapshot("MANUAL")
+	elif not Input.is_physical_key_pressed(KEY_F3):
+		debug_manual_pressed = false
+	if executing_moves.size() == 0:
+		debug_still_time = 0.0
+		debug_anim_time = 0.0
+		debug_anim_key = ""
+		return
+	if not is_on_floor() and abs(velocity.x) < 8.0 and abs(velocity.y) < 8.0:
+		debug_still_time += delta
+	else:
+		debug_still_time = 0.0
+	if debug_still_time > 0.5:
+		debug_still_time = 0.0
+		debug_snapshot("AIRBORNE_STILL")
+	var animation_key: String = str(animatedSprite.animation) + "@" + str(animatedSprite.frame)
+	if animation_key == debug_anim_key:
+		debug_anim_time += delta
+	else:
+		debug_anim_key = animation_key
+		debug_anim_time = 0.0
+	if debug_anim_time > 0.6:
+		debug_anim_time = 0.0
+		# 挂在墙上时动画停在 slide 的末帧是正常姿势，不算卡死，别刷屏。
+		if not is_clinging_to_wall():
+			debug_snapshot("ANIMATION_STALLED")
+
+var debug_manual_pressed: bool = false
+
+# —— 掉帧排查 ——
+# 每秒打一行 [PERF]（帧率/节点数/一秒内的事件计数），单帧间隔超过 33ms 立刻打一条 [HITCH]。
+# 事件计数只统计可能很贵的东西：招式起手、刀光判定生成、音效播放。
+var debug_event_counts: Dictionary = {}
+var debug_rate_elapsed: float = 0.0
+var debug_last_frame_usec: int = 0
+
+func debug_count_event(key: String) -> void:
+	if not debug_tracking_enabled():
+		return
+	debug_event_counts[key] = debug_event_counts.get(key, 0) + 1
+
+func debug_track_performance(delta: float) -> void:
+	var now_usec: int = OS.get_ticks_usec()
+	if debug_last_frame_usec > 0:
+		var gap_ms: float = float(now_usec - debug_last_frame_usec) / 1000.0
+		if gap_ms > 33.0:
+			print("[HITCH] gap=", stepify(gap_ms, 0.1), "ms fps=", Engine.get_frames_per_second(),
+				" nodes=", Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+				" anim=", animatedSprite.animation, "@", animatedSprite.frame,
+				" moves=", get_executing_abilities_names())
+			debug_dump_ability_log()
+	debug_last_frame_usec = now_usec
+	debug_rate_elapsed += delta
+	if debug_rate_elapsed >= 1.0:
+		debug_rate_elapsed = 0.0
+		var fps_now: int = Engine.get_frames_per_second()
+		var spam: bool = false
+		for key in debug_event_counts:
+			if int(debug_event_counts[key]) >= 30:
+				spam = true
+		# 平时不打；只有掉帧或者某个事件一秒里跑了 30 次以上才报，避免刷屏。
+		if fps_now < 55 or spam:
+			print("[PERF] fps=", fps_now,
+				" nodes=", Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+				" events=", debug_event_counts)
+		debug_event_counts = {}
+
+func debug_snapshot(reason: String) -> void:
+	var names: Array = []
+	for move in executing_moves:
+		names.append(move.name + ("(run)" if move.executing else "(ZOMBIE)"))
+	print("[ZERO-STATE] ", reason,
+		" | t=", OS.get_ticks_msec(),
+		" pos=", position,
+		" vel=", velocity,
+		" final=", final_velocity,
+		" anim=", animatedSprite.animation, "@", animatedSprite.frame,
+		" playing=", animatedSprite.playing,
+		" sprite_vis=", animatedSprite.visible,
+		" paused=", get_tree().paused,
+		" facing=", get_facing_direction(),
+		" on_floor=", is_on_floor(),
+		" wall_touch=", is_colliding_with_wall(),
+		" wall_reach=", is_in_reach_for_walljump(),
+		" cling=", is_clinging_to_wall(),
+		" moves=[", PoolStringArray(names).join(", "), "]")
+	debug_dump_ability_log()
+
+var debug_ability_log: Array = []
+
+func debug_log_ability(text: String) -> void:
+	if not debug_tracking_enabled():
+		return
+	debug_ability_log.append(str(OS.get_ticks_msec()) + ":" + text)
+	while debug_ability_log.size() > 30:
+		debug_ability_log.pop_front()
+
+func debug_dump_ability_log() -> void:
+	if debug_ability_log.size() == 0:
+		return
+	print("[ZERO-LOG] ", PoolStringArray(debug_ability_log).join(" | "))
+	debug_ability_log.clear()
+
+# —— 踢墙跳起跳锁定 ——
+# 起跳动画没播完之前：左右方向键一律当没按（不改朝向、不改位移），
+# 冲刺也不转成空中冲刺；窗口结束时如果冲刺键还按着，就把这一下补放出来。
+var walljump_commit_timer: float = 0.0
+var walljump_dash_buffered: bool = false
+
+func start_walljump_commit(seconds: float) -> void:
+	walljump_commit_timer = max(walljump_commit_timer, seconds)
+	walljump_dash_buffered = false
+
+func tick_walljump_commit(delta: float) -> void:
+	if walljump_commit_timer <= 0.0:
+		return
+	walljump_commit_timer -= delta
+	if walljump_commit_timer <= 0.0:
+		walljump_commit_timer = 0.0
+		consume_buffered_walljump_dash()
+
+func consume_buffered_walljump_dash() -> void:
+	if not walljump_dash_buffered:
+		return
+	walljump_dash_buffered = false
+	if not get_action_pressed("dash"):
+		return
+	var air_dash = get_ability("AirDash")
+	if air_dash == null or not air_dash.active or air_dash.executing:
+		return
+	if air_dash._StartCondition():
+		air_dash.ExecuteOnce()
+
+# 锁定期内只维持贴图朝向，不改 direction（位移仍按锁定前那一刻的输入走）。
+func update_facing_direction():
+	if walljump_commit_timer > 0.0:
+		if animatedSprite.scale.x != get_facing_direction():
+			animatedSprite.scale.x = get_facing_direction()
+		return
+	.update_facing_direction()
+
+# 定向专用：要越过"锁定期不改朝向"这道闸的时候用（踢墙起跳要把朝向摆成被踢的那面墙）。
+func force_facing(dir: int) -> void:
+	if dir == 0:
+		return
+	direction.x = dir
+	facing_right = dir > 0
+	if animatedSprite.scale.x != get_facing_direction():
+		animatedSprite.scale.x = get_facing_direction()
 
 func cutscene_activate() -> void :
 	if not is_executing("Ride"):
@@ -309,6 +480,24 @@ func is_colliding_with_wall() -> int:
 			return - 1
 	return 0
 
+# 当前操作算不算"攀墙"：人在空中、身体还贴着墙（短射线），且正朝墙按方向键。
+# 只看物理接触，不看招式名——踢墙之后 WallSlide/SaberWall 可能还挂在 executing 里，
+# 用它们判会把"已经离墙"误判成攀墙，表现为凭空踢墙、攻击方向反着来。
+func is_clinging_to_wall() -> bool:
+	if is_on_floor():
+		return false
+	var wall = is_colliding_with_wall()
+	if wall == 0:
+		return false
+	return get_pressed_axis() == wall
+
+# 攀墙的默认位移（水平朝墙推、垂直下滑）统一走 WallSlide 那一套。
+# 招式想挂在墙上放招就调这里；要"定住不下滑"就传 pinned = true。
+func apply_wall_cling_movement(pinned: bool = false) -> void :
+	var wall_slide = get_node_or_null("WallSlide")
+	if wall_slide != null and wall_slide.has_method("apply_cling_movement"):
+		wall_slide.apply_cling_movement(pinned)
+
 func is_colliding_with_wall_except_feet() -> int:
 	var right = [wallcheck_right, wallcheck_right2]
 	var left = [wallcheck_left, wallcheck_left2]
@@ -343,6 +532,10 @@ func check_for_normal(cast, normal: int, angle_range: float = 0.25) -> bool:
 	return cast.is_colliding() and cast.get_collision_normal().x > normal - angle_range and cast.get_collision_normal().x < normal + angle_range
 
 func get_pressed_axis() -> int:
+	# 踢墙跳的起跳动作没播完之前不响应左右：既不改朝向，也不拿方向去改位移。
+	# 过了这段时间照常读取，所以"按着不放"会在窗一结束就生效。
+	if walljump_commit_timer > 0.0:
+		return 0
 	var axis = 0
 	if get_action_pressed("move_left"):
 		axis = axis - 1

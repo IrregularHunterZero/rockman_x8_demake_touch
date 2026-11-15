@@ -50,11 +50,25 @@ func try_execution(move: BaseAbility, _logs: = false) -> void :
 			move.ExecuteOnce()
 
 func process_executing_moves(delta: float) -> void :
-	for move in executing_moves:
+	# 副本遍历：EndAbility 会在循环里改 executing_moves，顺便把两类坏条目清掉：
+	#   1) 僵尸：已经 Finalize 过（executing=false）却还留在表里；
+	#   2) 重复：同一个招式节点被重复入表，会让它的 _Update 一帧跑好几次（判定成倍生成）。
+	var seen: Dictionary = {}
+	for move in executing_moves.duplicate():
+		if not move.executing or seen.has(move):
+			if character_debug_enabled():
+				print("[ABILITY] dropped ", move.name, " (executing=", move.executing, ")")
+			executing_moves.erase(move)
+			continue
+		seen[move] = true
 		move.ExecuteEachFrame(delta)
 
+func character_debug_enabled() -> bool:
+	return has_method("debug_tracking_enabled") and call("debug_tracking_enabled")
+
 func remove_from_executing_list(move: BaseAbility):
-	executing_moves.erase(move)
+	while move in executing_moves:
+		executing_moves.erase(move)
 	if not move.conflicts_with_nothing():
 		last_used_ability = move
 

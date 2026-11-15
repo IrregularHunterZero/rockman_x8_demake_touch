@@ -16,6 +16,10 @@ signal cheat_pressed(visibility)
 
 var invulnerability: bool = false
 
+# F2 切换"可见碰撞形状"。这个菜单里本来没有对应按钮（_on_show_colliders_pressed 只留了函数，
+# DebugAndCheats.tscn 里既没有节点也没有 connection），所以这里补一个按键。
+var colliders_key_latch: bool = false
+
 func _set_character_node() -> void :
 	var char_node = CharacterManager.player_character
 	character = get_tree().current_scene.get_node(char_node)
@@ -42,6 +46,12 @@ func set_text_at_start() -> void:
 	invulnerability_text()
 
 func _physics_process(_delta: float) -> void:
+	if Input.is_key_pressed(KEY_F2):
+		if not colliders_key_latch:
+			colliders_key_latch = true
+			_on_show_colliders_pressed()
+	elif colliders_key_latch:
+		colliders_key_latch = false
 	if visible:
 		if Input.is_action_pressed("debug") and Input.is_action_pressed("debug2"):
 			_on_reset_checkpoint_pressed()
@@ -434,6 +444,7 @@ func _on_intro_stage_pressed() -> void:
 
 func _on_show_colliders_pressed() -> void:
 	get_tree().set_debug_collisions_hint(!get_tree().is_debugging_collisions_hint())
+	print("[COLLIDERS] ", "on" if get_tree().is_debugging_collisions_hint() else "off")
 
 func _on_subtank1_pressed() -> void:
 	for subtank in GameManager.player.get_node("Subtanks").get_children():
