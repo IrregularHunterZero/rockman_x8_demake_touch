@@ -25,7 +25,9 @@ func _Setup() -> void :
 	emitted_jump_signal = false
 	character.emit_signal("walljump")
 	walljump_direction = - character.is_in_reach_for_walljump()
-	character.set_direction( - walljump_direction)
+	# 朝向不在这里硬定：踢墙那一下已经在离墙了，朝向交还给玩家
+	# （按着方向键就跟着键走，松手则保持离墙侧）。
+	update_kick_facing()
 	maximum_moveaway = horizontal_velocity
 	moveaway = horizontal_velocity * walljump_direction
 	headbumped = false
@@ -120,11 +122,21 @@ func if_no_input_zero_vertical_speed() -> void :
 		.if_no_input_zero_vertical_speed()
 
 func set_movement_and_direction(horizontal_speed: float, _delta: = 0.016) -> void :
+	update_kick_facing()
 	if delay_has_expired():
 		if delay_and_move_away_duration_have_expired():
 			.set_movement_and_direction(horizontal_speed)
 		else:
 			move_away_from_wall(_delta)
+
+# 踢墙之后朝向跟着玩家：按方向键就跟着键走；没按就保持离墙一侧
+# （否则 direction 被写成 0，update_facing_direction 会当成朝右，贴右墙时又朝墙）。
+func update_kick_facing() -> void :
+	var pressed: int = get_pressed_direction()
+	if pressed != 0:
+		character.set_direction(pressed, true)
+	elif walljump_direction != 0:
+		character.set_direction(walljump_direction, true)
 
 func ascent_with_slowdown_after_delay(_delta: float) -> void :
 	if delay_has_expired():
@@ -138,7 +150,9 @@ func process_gravity(_delta: float, gravity: = default_gravity, _s = "null") -> 
 		.process_gravity(_delta, gravity)
 
 func move_away_from_wall(_delta: float):
-	character.set_horizontal_speed(move_away_speed * - character.get_facing_direction())
+	# 位移只由 walljump_direction 决定，不再用 -get_facing_direction() 反推：
+	# 朝向现在跟着玩家走（可能还按着朝墙键），拿它算位移会把人生往墙上推。
+	character.set_horizontal_speed(move_away_speed * walljump_direction)
 
 func pressing_towards_wall() -> bool:
 	return get_pressed_direction() != 0 and get_pressed_direction() != walljump_direction

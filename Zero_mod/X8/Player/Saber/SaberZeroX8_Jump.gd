@@ -517,6 +517,8 @@ func create_shingetsurin(ground_position) -> void :
 	get_tree().current_scene.get_node("Objects").call_deferred("add_child", instance, true)
 	instance.set_global_position(ground_position)
 	instance.set_creator(creator)
+	# 空中冲刺射击时人物还在跑（觉醒零 400px/s）：显形前跟着走，出手速度取两者较大的模量
+	instance.set_spawn_anchor(character, ground_position - character.global_position, character.velocity.x)
 	instance.call_deferred("initialize", get_facing_direction())
 
 func create_swordwave(ground_position, xspeed: float, yspeed: float, rotation_degress) -> void :

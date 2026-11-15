@@ -50,7 +50,7 @@ func change_animation_if_falling(_s) -> void :
 				character.start_dashfall()
 
 func move_away_from_wall(_delta: float):
-	character.set_horizontal_speed(horizontal_velocity * - character.get_facing_direction())
+	character.set_horizontal_speed(horizontal_velocity * walljump_direction)
 
 func on_touch_floor() -> void :
 	.on_touch_floor()

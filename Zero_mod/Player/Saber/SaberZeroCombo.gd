@@ -185,6 +185,8 @@ func create_shingetsurin(ground_position) -> void :
 	get_tree().current_scene.get_node("Objects").call_deferred("add_child", instance, true)
 	instance.set_global_position(ground_position)
 	instance.set_creator(creator)
+	# 显形前跟着人物走；出手速度模量不低于人物水平速度（基准仍是 280）
+	instance.set_spawn_anchor(character, ground_position - character.global_position, character.velocity.x)
 	instance.call_deferred("initialize", get_facing_direction())
 
 func _StartCondition() -> bool:
