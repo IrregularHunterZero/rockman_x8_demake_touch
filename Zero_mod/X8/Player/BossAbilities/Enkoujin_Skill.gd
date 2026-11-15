@@ -249,8 +249,6 @@ func _Update(delta: float) -> void :
 						dive.play()
 						create_wave()
 						lock_player_movement()
-						Tools.timer(0.2, "create_wave", self)
-						Tools.timer(0.4, "create_wave", self)
 						Tools.timer(0.4, "unlock_player_movement", self)
 						Event.emit_signal("screenshake", 1000)
 				else:
@@ -260,8 +258,6 @@ func _Update(delta: float) -> void :
 							dive.play()
 							create_wave()
 							lock_player_movement()
-							Tools.timer(0.2, "create_wave", self)
-							Tools.timer(0.4, "create_wave", self)
 							Tools.timer(0.4, "unlock_player_movement", self)
 							Event.emit_signal("screenshake", 1000)
 							use_genmu.reduce_ammo(CharacterManager.buster_base_energy * 0.5)
@@ -272,8 +268,24 @@ func _Update(delta: float) -> void :
 		update_bonus_horizontal_only_conveyor()
 
 func create_wave() -> void :
-	create_enkoujin_wave(last_position, 300, -1)
-	create_enkoujin_wave(last_position, -300, 1)
+	create_wave_burst(last_position)
+	schedule_wave_burst(0.2, last_position)
+	schedule_wave_burst(0.4, last_position)
+
+func schedule_wave_burst(delay: float, _position: Vector2) -> void :
+	# 后面两波火波自带落地点的坐标，不再去读 last_position：
+	# 这样 0.4s 内就算又起一次炎降刃，也不会把上一波的位置改到新落点上。
+	var timer: = Timer.new()
+	timer.wait_time = delay
+	timer.one_shot = true
+	timer.connect("timeout", self, "create_wave_burst", [_position])
+	timer.connect("timeout", timer, "queue_free")
+	add_child(timer)
+	timer.start()
+
+func create_wave_burst(_position: Vector2) -> void :
+	create_enkoujin_wave(_position, 300, -1)
+	create_enkoujin_wave(_position, -300, 1)
 
 func create_enkoujin_wave(ground_position, speed, direction) -> void :
 	var instance = enkoujinfire.instance()
@@ -298,6 +310,25 @@ func change_animation_if_falling(_s) -> void :
 	pass
 
 func _Interrupt() -> void :
+	# 落地那一帧如果还按着左右键，Walk 会在收招之前抢先起手并把动画改成 "walk"，
+	# 于是 _EndCondition 先判到"动画不在 saber_animations 里"直接结束本招，
+	# _Update 里的落地分支一次都跑不到，火波全被吞掉。炎降脚（Enkoukyaku）在
+	# 收招时会补一次落地火波所以没事，这里照它的写法补上：
+	# 只把火波放到落地那一刻记住的位置上，不锁操作、不挪角色——这时动画已经归
+	# Walk 了，再锁 0.4s 就成了"人物站在原地不能动"的怪手感。
+	if not enkoujin_wave_created and character.is_on_floor():
+		last_position = character.global_position
+		if CharacterManager.awakened_zero_armor:
+			enkoujin_wave_created = true
+			dive.play()
+			create_wave()
+			Event.emit_signal("screenshake", 1000)
+		elif character.get_action_pressed("select_special") and CharacterManager.extra_saber_combo and use_genmu.has_ammo_expent(CharacterManager.buster_base_energy * 0.5):
+			enkoujin_wave_created = true
+			dive.play()
+			create_wave()
+			Event.emit_signal("screenshake", 1000)
+			use_genmu.reduce_ammo(CharacterManager.buster_base_energy * 0.5)
 	if not character.is_on_floor():
 		animatedSprite.animation = "fall"
 	if is_instance_valid(current_hitbox):
