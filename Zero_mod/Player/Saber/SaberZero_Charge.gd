@@ -451,14 +451,50 @@ func charged_saber_release(charge_level) -> void :
 				self.ExecuteOnce()
 		
 	elif charge_level <= 2:
-		if not CharacterManager.extra_saber_06:
-			return
-		# 攀墙时的千子斩（下劈突进）会直接把人蹬下墙，这里先不放，
-		# 攀墙只给蓄力斩（3 级）。
-		if character.is_executing("WallSlide") or character.is_executing("SaberWall"):
-			return
-		if animatedSprite.frames.has_animation("charge_saber_land") and animatedSprite.frames.has_animation("charge_sentsuizan"):
-			self.ExecuteOnce()
+		# L1~L2 松手：不再放千子斩，改成普通攻击。
+		# 千子斩已改成指令输入（空中斜下+攻击），见 _physics_process / start_sentsuizan()。
+		release_normal_attack()
+
+# L1~L2 松手等于"普通攻击"：直接起对应的普通斩（空中 SaberJump / 地面 SaberCombo）。
+func release_normal_attack() -> void:
+	if not character.has_control():
+		return
+	var ability_name: String = "SaberCombo"
+	if not character.is_on_floor():
+		ability_name = "SaberJump"
+	character.force_execute(ability_name)
+
+# —— 千子斩的新输入：空中 + 按住下 + 方向朝人物朝向 + 攻击 ——
+# 原来是"蓄力 1~2 级松手"放的，现在蓄力只负责蓄力斩（3 级），
+# 下劈突进单独做成指令；开关沿用 extra_saber_06。
+func _physics_process(_delta: float) -> void:
+	._physics_process(_delta)
+	if executing or not active:
+		return
+	if not character.has_control() or character.is_on_floor():
+		return
+	if not CharacterManager.extra_saber_06:
+		return
+	if not character.get_action_just_pressed("fire"):
+		return
+	if not character.get_action_pressed("move_down"):
+		return
+	var pressed: int = character.get_pressed_axis()
+	if pressed == 0 or pressed != character.get_facing_direction():
+		return
+	start_sentsuizan()
+
+func start_sentsuizan() -> void:
+	if executing:
+		return
+	if character.is_executing("WallSlide") or character.is_executing("SaberWall"):
+		return
+	# 同帧可能已经起了普通空中斩，先收掉再放（SaberCharge 的冲突表里没有 SaberJump）
+	if character.is_executing("SaberJump"):
+		character.force_end("SaberJump")
+	if animatedSprite.frames.has_animation("charge_saber_land") and animatedSprite.frames.has_animation("charge_sentsuizan"):
+		is_charge_saber = false
+		self.ExecuteOnce()
 
 func end_saber_state():
 	return end_state

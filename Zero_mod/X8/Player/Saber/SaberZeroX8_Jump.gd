@@ -544,6 +544,11 @@ func _StartCondition() -> bool:
 	if CharacterManager.extra_saber_combo and CharacterManager.extra_saber_04 and character.saber_node.current_weapon.name == "Saber":
 		if character.get_action_pressed("move_down") and not character.get_action_pressed("move_left") and not character.get_action_pressed("move_right"):
 			return false
+	# 斜下（前）+ 攻击 现在是指令式千子斩（见 SaberZero_Charge._physics_process），普通空中斩让路。
+	if CharacterManager.extra_saber_06 and character.get_action_pressed("move_down"):
+		var dive_axis: int = character.get_pressed_axis()
+		if dive_axis != 0 and dive_axis == character.get_facing_direction():
+			return false
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
 		return false

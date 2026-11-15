@@ -14,8 +14,6 @@ export  var minimum_charge_time: = 0.5
 export  var level_3_charge: = 1.75
 export  var level_4_charge: = 2.75
 
-export  var charge_time_reduction: = 0.0
-
 var current_weapon
 onready var audio2 = $audioStreamPlayer2
 onready var charge1_volume = $audioStreamPlayer.volume_db
@@ -39,8 +37,6 @@ func _ready() -> void :
 	audio2 = get_node("audioStreamPlayer2")
 	Tools.timer_p(0.1, "set_deferred", self, ["debug_logs", false])
 	actions[0] = "fire"
-	if CharacterManager.black_zero_armor or CharacterManager.awakened_zero_armor:
-		charge_time_reduction = 0.5
 
 func on_pause():
 	if executing:
@@ -103,7 +99,7 @@ func _Update(_delta: float) -> void :
 	effect_position()
 	cancel_charge()
 	if get_charge_released() and character.listening_to_inputs or get_charge_just_pressed() and character.listening_to_inputs:
-		if charged_time > minimum_charge_time * (1 - charge_time_reduction):
+		if charged_time > minimum_charge_time:
 			emit_fire_charged_signal(get_charge_level())
 		else:
 			EndAbility()
@@ -221,29 +217,47 @@ func get_charge_released() -> bool:
 	return not get_action_pressed(charge_button)
 
 func get_charge_level() -> int:
-	if charged_time < minimum_charge_time * (1 - charge_time_reduction):
+	if charged_time < minimum_charge_time:
 		return 0
-	if charged_time < level_3_charge * (1 - charge_time_reduction):
+	if charged_time < level_3_charge:
 		return 1
-	if charged_time < level_4_charge * (1 - charge_time_reduction):
+	if charged_time < level_4_charge:
 		return 2
-	if charged_time > level_4_charge * (1 - charge_time_reduction):
+	if charged_time > level_4_charge:
 		return 3
 	return 0
 
 func _EndCondition() -> bool:
 	if charged_time == 0 and timer > 0.1:
 		return true
-	if charged_time < minimum_charge_time * (1 - charge_time_reduction) and not get_charge_pressed():
+	if charged_time < minimum_charge_time and not get_charge_pressed():
 		return true
 	if character.is_executing("Ride"):
 		return true
 	return false
 	
+# 蓄力计时只在"没在出招"时走：任意攻击/必杀进行中按下攻击键可以启动蓄力，
+# 但时间从招式结束才开始算。原来是连招期间就偷偷攒时间，松手直接串成蓄力斩。
+const charge_pause_moves = [
+	"SaberCombo", "SaberJump", "SaberDash", "SaberWall", "SaberCharge",
+	"KnuckleCombo", "KnuckleDash", "KnuckleJump", "KnuckleWall",
+	"Tenshouha", "Juuhazan", "Rasetsusen", "Raikousen", "Youdantotsu",
+	"Hyouryuushou", "Enkoujin", "Ryuenjin", "Enkoujin_Extra", "Rekuhouha",
+	"Genmuzero", "Desperation",
+]
+
+func is_attack_in_progress() -> bool:
+	for move_name in charge_pause_moves:
+		if character.is_executing(move_name):
+			return true
+	return false
+
 func charge(_delta: float):
+	if is_attack_in_progress():
+		return
 	if charged_time < maximum_charge_time:
 		charged_time += _delta
-	if charged_time > minimum_charge_time * (1 - charge_time_reduction):
+	if charged_time > minimum_charge_time:
 		if not charging:
 			start_vfx()
 	if get_charge_level() > 1:
@@ -251,7 +265,7 @@ func charge(_delta: float):
 				emit_charged_particle()
 				mid_charge = true
 	if not max_charge:
-		if super_charge_time > 0 and charged_time > level_4_charge * (1 - charge_time_reduction):
+		if super_charge_time > 0 and charged_time > level_4_charge:
 			Log("Started super VFX")
 			max_charge = true
 			change_color(super_color)

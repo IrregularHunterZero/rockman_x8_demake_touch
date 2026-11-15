@@ -322,11 +322,10 @@ func set_charge_full_time(full_time: float) -> void :
 	var charge = get_node_or_null("Charge")
 	if charge == null:
 		return
-	var factor: float = full_time / charge_ladder_full_time
-	# L1（开始进蓄力、也就是千子斩的起手）统一 0.5s，不跟着 full_time 缩放：
-	# 按久一点就串成别的招的观感比"各形态蓄力节奏不同"更糟，先按住这一条。
-	charge.minimum_charge_time = 0.5
-	charge.level_3_charge = 3.0 * factor
+	# L1 / L2 固定 0.45s / 0.48s，不再跟 full_time 缩放，也不再乘任何减免系数：
+	# L1~L2 松手只放普通攻击；L3（蓄力斩）仍按 full_time（3.0 / 2.0 / 1.0）。
+	charge.minimum_charge_time = 0.45
+	charge.level_3_charge = 0.48
 	charge.level_4_charge = full_time
 
 func equip_zero_parts() -> void :
