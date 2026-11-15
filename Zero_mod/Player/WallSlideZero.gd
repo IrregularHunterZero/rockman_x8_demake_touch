@@ -37,6 +37,9 @@ func _StartCondition() -> bool:
 	if _animation in character.saber_animations:
 		if not "saber_jump" in _animation:
 			return false
+	# 悬停期间不派生攀墙：悬停是"定在原地"，这时候去挂墙会两套位移互相抢。
+	if character.is_executing("HoverZero"):
+		return false
 		if "saber_jump" in _animation:
 			if character.animatedSprite.frame < 5:
 				return false

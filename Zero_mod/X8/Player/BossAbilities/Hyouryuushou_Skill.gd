@@ -58,6 +58,16 @@ var end_frame: int = 26
 
 func _ready() -> void :
 	animatedSprite.connect("animation_finished", self, "_on_animation_finished")
+	if active:
+		character.listen("headbump", self, "on_headbump")
+
+# 顶到天花板：立刻收招进入空中态，不再沿上升曲线继续往上钻。
+func on_headbump() -> void:
+	if executing:
+		character.set_vertical_speed(0)
+		EndAbility()
+		if not character.is_on_floor():
+			character.play_animation("fall")
 
 func _on_animation_finished() -> void :
 	ending_saber_state = true
@@ -423,9 +433,9 @@ func ascend_slowdown_value() -> float:
 
 func process_air_jump_ascent(delta: float) -> void:
 	if ascending:
-		if not attack_is_held():
-			ascending = false
-		elif character.get_vertical_speed() > 0:
+		# 空中冰龙升的高度只看上升曲线本身，不再跟特殊攻击键挂钩：
+		# 原来松开特殊键就会中断上升，等于"用特殊键改高度"，和出招键绑在一起很别扭。
+		if character.get_vertical_speed() > 0:
 			ascending = false
 		else:
 			var value = ascend_slowdown_value()

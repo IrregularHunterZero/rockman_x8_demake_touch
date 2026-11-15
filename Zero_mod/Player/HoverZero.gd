@@ -4,7 +4,8 @@ class_name HoverZero
 # 白 Axl（Floppa Axl）的悬停逻辑移植到觉醒 Zero。
 #
 # 进入：空中按住"下"再按跳键（下+跳），会打断当前的跳跃直接进入悬停。
-# 退出：松开跳键、落地、贴墙、或接上空中冲刺。
+# 退出：松开跳键、落地、或接上空中冲刺。
+#       （不再因为贴墙/按朝墙键而退出——悬停与攀墙互不派生，想挂墙先松开跳键。）
 # 允许的派生：
 #   - 冲刺键按下 -> 空中冲刺照常启动，悬停当场结束，之后和悬停无关。
 #   - 装了手炮（Z-Buster / 节点名 Z-Breaker）时的攻击派生，悬停不中断，
@@ -56,6 +57,15 @@ func buster_equipped() -> bool:
 func _StartCondition() -> bool:
 	if requires_awakened_armor and not CharacterManager.awakened_zero_armor:
 		return false
+	# 攀墙期间不派生悬停：只要还贴在墙的探测范围内就不给悬停
+	# （is_colliding_with_wall 是 8px 探测，正好覆盖"挂在墙上/刚从墙上下来"）。
+	# 想悬停就先离开墙，别跟攀墙抢控制。
+	if character.is_colliding_with_wall() != 0:
+		return false
+	if character.is_executing("WallSlide"):
+		return false
+	if character.has_method("is_clinging_to_wall") and character.is_clinging_to_wall():
+		return false
 	if character.is_on_floor():
 		return false
 	# 唯一门槛写在这里：Ability.Should_Execute 对 should_execute_on_hold 的写法
@@ -65,8 +75,6 @@ func _StartCondition() -> bool:
 	if not character.get_action_just_pressed("jump"):
 		return false
 	if character.get_animation() in character.saber_animations:
-		return false
-	if pressing_towards_wall():
 		return false
 	return true
 
@@ -128,8 +136,8 @@ func refresh_hover_animation() -> void:
 func _EndCondition() -> bool:
 	if character.is_on_floor():
 		return true
-	if pressing_towards_wall():
-		return true
+	# 不再因为"按着朝墙键"而退出悬停：那是攀墙的入口状态，退出就会一帧后挂上去。
+	# 悬停→攀墙被禁止，想挂墙就先松开跳键结束悬停。
 	if actions.size() > 0 and not character.get_action_pressed(actions[0]):
 		return true
 	# 空中冲刺真的起来了才结束悬停；没有跳数、冲不出去时继续悬着

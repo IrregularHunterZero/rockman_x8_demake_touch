@@ -51,7 +51,16 @@ var loop_start_frame = 10
 var end_frame = 26
 
 func _ready():
-	pass
+	if active:
+		character.listen("headbump", self, "on_headbump")
+
+# 顶到天花板：立刻收招进入空中态（与 X8 版一致）。
+func on_headbump() -> void:
+	if executing:
+		character.set_vertical_speed(0)
+		EndAbility()
+		if not character.is_on_floor():
+			character.play_animation("fall")
 
 func reset_hitbox():
 	hitbox_upleft = Vector2(0, 0)
@@ -222,9 +231,8 @@ func ascend_slowdown_value() -> float:
 
 func process_air_jump_ascent(delta: float) -> void:
 	if ascending:
-		if not attack_is_held():
-			ascending = false
-		elif character.get_vertical_speed() > 0:
+		# 同 X8 版：空中冰龙升的高度不再受特殊攻击键影响。
+		if character.get_vertical_speed() > 0:
 			ascending = false
 		else:
 			var value = ascend_slowdown_value()
