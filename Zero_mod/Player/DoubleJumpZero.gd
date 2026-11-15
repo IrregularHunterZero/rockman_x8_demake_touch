@@ -37,8 +37,20 @@ func _physics_process(delta: float) -> void :
 	._physics_process(delta)
 	recharge(delta)
 
+# 这两个招式期间一律冻结回充，连全功率的"无限空中资源"也不给：
+# 否则借着招式动画拖时间就能无限续（冰龙升的各变招共用同一个节点名）。
+const hard_block_recharge_moves: Array = ["Hyouryuushou", "Raikousen"]
+
+func is_hard_blocked() -> bool:
+	for move in character.executing_moves:
+		if move.name in hard_block_recharge_moves:
+			return true
+	return false
+
 func recharge(delta: float) -> void :
 	if not time_based_recharge or not active:
+		return
+	if is_hard_blocked():
 		return
 	if is_full_power_awakened():
 		current_air_jumps = max_air_jumps

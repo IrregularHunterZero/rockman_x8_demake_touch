@@ -323,9 +323,12 @@ func _StartCondition() -> bool:
 		return false
 	# 冲刺 + 特殊（特殊键在冲刺按下后 100ms 内）算组合命令：
 	# 即使冲刺被踢墙窗口/贴墙挡住、还没真正起手，也直接出雷光闪（它的收招稳定，打断踢墙不鬼畜）。
+	# 但要收一次空中资源：模式 1 由冲刺付账，模式 2 没有冲刺，得在这里自己付，
+	# 否则"按住冲刺+特殊"可以无限放。
 	if character.has_method("dash_special_chord_active") and character.dash_special_chord_active():
 		if character.get_action_pressed("dash") and not character.is_on_floor():
-			return not executing
+			if character.is_executing("AirDash") or air_charges() > 0:
+				return not executing
 	if not executing:
 		if _animation == "dash":
 			return true
@@ -345,7 +348,25 @@ func _EndCondition() -> bool:
 		return true
 	return false
 
+func air_charges() -> int:
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump == null:
+		return 1
+	return airjump.current_air_jumps
+
+# 模式 2（空中、但没有冲刺在执行）自己付一次空中资源。
+# 模式 1 的账由 AirDash 起手时已经付过，这里不能再扣。
+func pay_air_charge_without_dash() -> void:
+	if character.is_on_floor():
+		return
+	if character.is_executing("AirDash") or character.is_executing("Dash"):
+		return
+	var airjump = character.get_node_or_null("AirJump")
+	if airjump != null:
+		airjump.reduce_air_jumps(1)
+
 func _Setup() -> void :
+	pay_air_charge_without_dash()
 	create_slash = false
 	effect_spawn_timer = 0.0
 	if character.saber_node.current_weapon.name == "Saber":
