@@ -48,9 +48,15 @@ func cast_laser() -> void :
 func _StartCondition() -> bool:
 	if not character.Tenshouha:
 		return false
-	if not use_genmu.has_ammo_expent(CharacterManager.buster_base_energy * 0.5) and character.saber_node.current_weapon.name == "Z-Breaker":
-		if not CharacterManager.awakened_zero_armor:
-			return false
+	if not CharacterManager.awakened_zero_armor:
+		if character.saber_node.current_weapon.name == "Z-Breaker":
+			# 灭闪光 20 / 烈光霸 30：起手最低按灭闪光的档位放行，烈光霸在出招时再验一次
+			if not use_genmu.has_ammo_expent(20):
+				return false
+		else:
+			# 天照霸 40
+			if not use_genmu.has_ammo_expent(40):
+				return false
 	if not character.get_action_pressed("move_down"):
 		return false
 	var _animation = get_parent().get_animation()
@@ -208,6 +214,8 @@ func fire_laser() -> void :
 			if CharacterManager.awakened_zero_armor:
 				create_laser(ground_position + Vector2( + 40, 0))
 				create_laser(ground_position + Vector2( - 40, 0))
+			if not CharacterManager.awakened_zero_armor:
+				use_genmu.reduce_ammo(40)
 	if character.saber_node.current_weapon.name == "V-Hanger":
 			hangerarrow_sound.play()
 			if CharacterManager.awakened_zero_armor:
@@ -216,6 +224,8 @@ func fire_laser() -> void :
 				create_arrow(global_position, 6)
 			else:
 				create_arrow(global_position, 5)
+			if not CharacterManager.awakened_zero_armor:
+				use_genmu.reduce_ammo(40)
 	if character.saber_node.current_weapon.name == "Rogue-Blade":
 			roguewave_sound.play()
 			if CharacterManager.awakened_zero_armor:
@@ -224,6 +234,8 @@ func fire_laser() -> void :
 				create_rogueslash(global_position, 6)
 			else:
 				create_rogueslash(global_position, 5)
+			if not CharacterManager.awakened_zero_armor:
+				use_genmu.reduce_ammo(40)
 	if character.saber_node.current_weapon.name == "Sigma-Blade":
 		if ground_check.is_colliding():
 			ground_position = ground_check.get_collision_point()
@@ -240,6 +252,8 @@ func fire_laser() -> void :
 				create_laser(ground_position)
 				create_laser(ground_position + Vector2( + 40, 0))
 				create_laser(ground_position + Vector2( - 40, 0))
+				if not CharacterManager.awakened_zero_armor:
+					use_genmu.reduce_ammo(40)
 
 	if character.saber_node.current_weapon.name == "Z-Breaker":
 		if character.get_action_pressed("select_special") and use_genmu.has_ammo_expent(CharacterManager.buster_base_energy * 1.5):
@@ -272,7 +286,7 @@ func fire_laser() -> void :
 				create_rekohouha(global_position, -67.5)
 				create_rekohouha(global_position, -90)
 				if not CharacterManager.awakened_zero_armor:
-					use_genmu.reduce_ammo(CharacterManager.buster_base_energy * 0.25)
+					use_genmu.reduce_ammo(20)
 
 func summon_rekohouha() -> void :
 	if not CharacterManager.player_character == "Zero":
@@ -317,7 +331,9 @@ func create_laser(ground_position) -> void :
 	instance.deflectable = true
 	instance.ignore_hit_invulnerability = true
 	instance.damage = 3
-	instance.damage_to_bosses = 1.5
+	instance.damage_to_bosses = 1
+	if CharacterManager.awakened_zero_armor:
+		instance.damage_to_bosses = 1.5
 	instance.damage_to_weakness = 25
 	get_tree().current_scene.get_node("Objects").call_deferred("add_child", instance, true)
 	instance.set_global_position(ground_position)
@@ -368,7 +384,7 @@ func create_rekohouha(ground_position, degrees: float) -> void :
 	var instance = rekohouha.instance()
 	ground_position.y += 5
 	instance.damage = CharacterManager.z_buster_base_damage * 2
-	instance.damage_to_bosses = CharacterManager.z_buster_base_damage * 2
+	instance.damage_to_bosses = 5
 	instance.damage_to_weakness = CharacterManager.z_buster_base_damage * 2
 	instance.rotate_degrees(degrees)
 	instance.rekohouha = false
@@ -405,9 +421,9 @@ func create_rekohouha(ground_position, degrees: float) -> void :
 func create_crashbeam(ground_position, down_value) -> void :
 	var instance = crashbeam.instance()
 	ground_position.y += 10
-	instance.damage = CharacterManager.z_buster_base_damage * 5
-	instance.damage_to_bosses = CharacterManager.z_buster_base_damage * 5
-	instance.damage_to_weakness = CharacterManager.z_buster_base_damage * 5
+	instance.damage = 20
+	instance.damage_to_bosses = 20
+	instance.damage_to_weakness = 20
 	instance.speed = 1200 * down_value
 	instance.scale.y = 1 * down_value
 	instance.z_index += 25

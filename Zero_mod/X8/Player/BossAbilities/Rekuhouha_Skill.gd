@@ -41,7 +41,7 @@ func _StartCondition() -> bool:
 		return false
 	if not CharacterManager.extra_saber_05:
 		return false
-	if not use_genmu.has_ammo_expent(CharacterManager.buster_base_energy * 0.5) and not CharacterManager.awakened_zero_armor:
+	if not use_genmu.has_ammo_expent(30) and not CharacterManager.awakened_zero_armor:
 		return false
 	if not character.get_action_pressed("move_down"):
 		return false
@@ -167,7 +167,7 @@ func fire_laser() -> void :
 	Tools.timer(0.4, "summon_rekohouha", self)
 	Tools.timer(0.5, "summon_rekohouha", self)
 	if not CharacterManager.awakened_zero_armor:
-		use_genmu.reduce_ammo(CharacterManager.buster_base_energy * 0.5)
+		use_genmu.reduce_ammo(30)
 	if character.saber_node.current_weapon.name == "K-Knuckle":
 		animatedSprite.frame = 7
 
@@ -187,9 +187,13 @@ func summon_rekohouha() -> void :
 func create_rekohouha(ground_position) -> void :
 	var instance = rekohouha.instance()
 	ground_position.y += 10
-	instance.damage = CharacterManager.z_buster_base_damage * 2
-	instance.damage_to_bosses = CharacterManager.z_buster_base_damage * 2
-	instance.damage_to_weakness = CharacterManager.z_buster_base_damage * 2
+	# 普通零 20；觉醒零 / 全功率 30，三种伤害统一
+	var shot_damage = 20
+	if CharacterManager.awakened_zero_armor:
+		shot_damage = 30
+	instance.damage = shot_damage
+	instance.damage_to_bosses = shot_damage
+	instance.damage_to_weakness = shot_damage
 	get_tree().current_scene.get_node("Objects").call_deferred("add_child", instance, true)
 	instance.set_global_position(ground_position)
 	instance.set_creator(creator)
