@@ -86,6 +86,9 @@ func is_recharge_blocked() -> bool:
 	return false
 
 func _Setup() -> void :
+	# 二段跳取消空中蓄力斩：先收掉蓄力斩，避免两套位移/动画互相抢。
+	if character.is_executing("SaberCharge"):
+		character.force_end("SaberCharge")
 	interrupt_if_needed()
 	reduce_air_jumps(1)
 	if character.get_action_pressed(dash_action):
@@ -116,8 +119,12 @@ func set_max_air_jumps(value: int):
 	Log("setting max airjumps:" + str(current_air_jumps))
 
 func _StartCondition() -> bool:
+	if character.is_executing("HoverZero"):
+		return false
 	var _animation = get_parent().get_animation()
-	if _animation in character.saber_animations:
+	# 空中蓄力斩的判定段结束后允许二段跳取消：跳跃键不再被整段吞掉。
+	var charge_jump_cancel: bool = character.is_executing("SaberCharge") and _animation == "charge_saber_jump" and character.animatedSprite.frame >= 12
+	if _animation in character.saber_animations and not charge_jump_cancel:
 		return false
 	if current_air_jumps <= 0:
 		return false

@@ -977,18 +977,17 @@ func _StartCondition() -> bool:
 	if not executing:
 		if character.is_on_floor():
 			return true
-		# 悬停中的手炮下段派生：动作和地面上是同一套（saber_shot_fast1/2），
+		# 剑装悬停中的普通攻击按地面普通攻击派生（动作和地面上是同一套），
 		# 滞空由 HoverZero 保持，动作播完自动回到悬停循环。
-		if hover_buster_down_derivation():
-			return true
+		# 手炮（Z-Breaker）保留原来的空中手炮派生（SaberJump），
+		# 但“下 + 攻击”仍然是手炮下段派生（saber_shot_fast1/2）。
+		if character.is_executing("HoverZero"):
+			if character.saber_node.current_weapon.name == "Z-Breaker":
+				if character.get_action_pressed("move_down"):
+					return true
+			else:
+				return true
 	return false
-
-func hover_buster_down_derivation() -> bool:
-	if not character.is_executing("HoverZero"):
-		return false
-	if not character.get_action_pressed("move_down"):
-		return false
-	return character.saber_node.current_weapon.name == "Z-Breaker"
 
 func _ResetCondition() -> bool:
 	return false

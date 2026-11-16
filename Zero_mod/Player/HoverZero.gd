@@ -8,13 +8,15 @@ class_name HoverZero
 #       （不再因为贴墙/按朝墙键而退出——悬停与攀墙互不派生，想挂墙先松开跳键。）
 # 允许的派生：
 #   - 冲刺键按下 -> 空中冲刺照常启动，悬停当场结束，之后和悬停无关。
-#   - 装了手炮（Z-Buster / 节点名 Z-Breaker）时的攻击派生，悬停不中断，
-#     攻击动作播完自动回到悬停循环（跳跃键没松就一直悬着）：
+#   - 剑装：
+#       攻击                 -> 地面普通攻击（SaberCombo 的 saber_1..6）
+#       特殊攻击（无方向）   -> 十文字斩（地面版）
+#   - 手炮（Z-Buster / 节点名 Z-Breaker）：
 #       攻击                 -> 手炮普通攻击（SaberJump）
 #       下 + 攻击            -> 手炮下段派生（SaberCombo 的 saber_shot_fast1/2）
 #       上 + 特殊攻击        -> 冰龙升（手炮版是 Drift Diamond 弹）
-#       左右 + 特殊攻击      -> 叶断突
-#       特殊攻击（无方向）   -> 十文字斩的手炮版（连续炮击），不再是空中的罗刹旋
+#       左右 + 特殊攻击      -> 叶断突（动作改播空中射击 saber_shot_fast1）
+#       特殊攻击（无方向）   -> 十文字斩的手炮版（连续炮击）
 #   其余攻击仍然派生不出来（悬停是高优先级）。
 # 资源：悬停不消耗 AirJump 的空中资源，空中冲刺也与它无关；
 #       但悬停期间空中资源不恢复（DoubleJumpZero.recharge_blocking_moves 里有 "HoverZero"）。
@@ -30,7 +32,7 @@ export var requires_awakened_armor: bool = true
 var down_armed: bool = false
 
 # 能压着悬停放的派生动作。悬停对它们只做两件事：别抢动画，垂直别往下沉。
-const hover_attacks: Array = ["SaberCombo", "SaberJump", "SaberDash", "SaberWall", "Juuhazan", "Youdantotsu", "Hyouryuushou"]
+const hover_attacks: Array = ["SaberCombo", "SaberJump", "SaberDash", "SaberWall", "Juuhazan", "Youdantotsu", "Hyouryuushou", "SaberCharge"]
 
 
 func should_execute_on_hold() -> bool:
@@ -41,9 +43,36 @@ func is_high_priority() -> bool:
 	# 所以按下对应按键的这段时间先让出高优先级；结束判定在 _EndCondition 里做。
 	if character.get_action_pressed("dash"):
 		return false
-	if buster_equipped() and (character.get_action_pressed("fire") or character.get_action_pressed("alt_fire")):
+	# 普通攻击：悬停里按地面普通攻击派生（SaberCombo），不再走空中斩。
+	if character.get_action_pressed("fire") and (saber_equipped() or buster_equipped()):
 		return false
+	# 特殊攻击：手炮的既有派生照旧；剑装无方向时是十文字斩。
+	if character.get_action_pressed("alt_fire"):
+		if buster_equipped():
+			return false
+		if saber_equipped() and not any_direction_pressed():
+			return false
 	return true
+
+func saber_equipped() -> bool:
+	var shot_node = character.get_node_or_null("Shot")
+	if shot_node == null:
+		return false
+	var weapon = shot_node.get("current_weapon")
+	if weapon == null:
+		return false
+	return weapon.name == "Saber"
+
+func any_direction_pressed() -> bool:
+	if character.get_action_pressed("move_left"):
+		return true
+	if character.get_action_pressed("move_right"):
+		return true
+	if character.get_action_pressed("move_up"):
+		return true
+	if character.get_action_pressed("move_down"):
+		return true
+	return false
 
 func buster_equipped() -> bool:
 	var shot_node = character.get_node_or_null("Shot")

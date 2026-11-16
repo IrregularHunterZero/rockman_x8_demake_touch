@@ -66,6 +66,13 @@ func should_dash() -> bool:
 func Should_Execute() -> bool:
 	if not active:
 		return false
+	# 空中蓄力斩后摇的冲刺取消：判定段之后新按下的冲刺直接起冲。
+	if character.has_method("can_dash_cancel_charge") and character.can_dash_cancel_charge():
+		if conflicting_abilities():
+			return false
+		action = actions[0]
+		input = get_action_value()
+		return true
 	if character.has_method("dash_hold_available"):
 		if not character.dash_hold_available():
 			return false
@@ -119,7 +126,10 @@ func _ResetCondition() -> bool:
 func _StartCondition() -> bool:
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
-		return false
+		# 空中蓄力斩的后摇允许用“新按下的冲刺”取消。
+		var charge_cancel: bool = character.has_method("can_dash_cancel_charge") and character.can_dash_cancel_charge()
+		if not charge_cancel:
+			return false
 	# 踢墙跳起跳锁定期间不许抢：窗口结束后如果冲刺还按着，Character 会把这一下补放出来。
 	if character.walljump_commit_timer > 0.0:
 		return false

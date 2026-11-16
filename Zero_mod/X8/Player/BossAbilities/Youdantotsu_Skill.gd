@@ -248,7 +248,12 @@ func play_strike_sound(frame: int) -> void :
 			sound_counter += 1
 
 func set_saber_animations() -> void :
-	animatedSprite.animation = "youdantotsu"
+	# 悬停里的手炮变招（火箭）：角色改播空中射击动作，伤害由弹体负责。
+	if character.is_executing("HoverZero") and buster_equipped():
+		animatedSprite.animation = "saber_shot_fast1"
+		animatedSprite.frame = 0
+	else:
+		animatedSprite.animation = "youdantotsu"
 	if character.saber_node.current_weapon.name != "D-Glaive":
 		saber_sound.play()
 
@@ -313,7 +318,7 @@ func _ResetCondition() -> bool:
 func _EndCondition() -> bool:
 	var _animation = get_parent().get_animation()
 	if _animation in character.saber_animations:
-		if not _animation == "youdantotsu":
+		if not _animation == "youdantotsu" and not _animation == "saber_shot_fast1":
 			return true
 		if end_saber_state():
 			return true

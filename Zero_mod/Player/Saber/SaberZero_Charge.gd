@@ -406,11 +406,6 @@ func charged_saber_release(charge_level) -> void :
 	if not character.has_control():
 		Log("Couldn\'t charged fire, character has no control")
 		return
-	# Charge 的 conflicting_moves 里带 "Nothing"，所以高优先级的悬停挡不住蓄力释放；
-	# 在悬停里放出来的话动作会被悬停的动画覆盖、还会互相抢重力，这里直接不让它出。
-	if character.is_executing("HoverZero"):
-		Log("Couldn\'t charged fire, hovering")
-		return
 	if not CharacterManager.extra_saber_combo:
 		return
 	if character.is_executing("Intro") or \
@@ -460,7 +455,7 @@ func release_normal_attack() -> void:
 	if not character.has_control():
 		return
 	var ability_name: String = "SaberCombo"
-	if not character.is_on_floor():
+	if not character.is_on_floor() and not character.is_executing("HoverZero"):
 		ability_name = "SaberJump"
 	character.force_execute(ability_name)
 
@@ -474,6 +469,14 @@ func _physics_process(_delta: float) -> void:
 	if not character.has_control() or character.is_on_floor():
 		return
 	if not CharacterManager.extra_saber_06:
+		return
+	# 空中自由态才允许旋坠斩：悬停、其他攻击动作里都不抢输入，
+	# 否则悬停里的“下+攻击”派生会被这条指令截走。
+	# 蓄力本身的动画也是 jump/fall，所以这里不拦 Charge——指令输入本来就优先于蓄力。
+	if character.is_executing("HoverZero"):
+		return
+	var _anim = character.get_animation()
+	if _anim != "jump" and _anim != "fall" and _anim != "double_jump":
 		return
 	if not character.get_action_just_pressed("fire"):
 		return
@@ -509,12 +512,14 @@ func set_saber_animations():
 		saber_sound.play()
 		return
 	if is_charge_saber:
-		Tools.timer(0.5, "finish", self)
 		if character.is_on_floor():
+			Tools.timer(0.5, "finish", self)
 			animatedSprite.animation = "charge_saber_land"
 			animatedSprite.frame = 0
 			saber_sound.play()
 		else:
+			# 空中蓄力斩的动画本身 0.37s：别再多锁到 0.5s，收招跟着动画走。
+			Tools.timer(0.36, "finish", self)
 			animatedSprite.animation = "charge_saber_jump"
 			animatedSprite.frame = 0
 			saber_sound.play()
@@ -644,12 +649,20 @@ func _Interrupt():
 		restore_cling_animation()
 		if not character.is_clinging_to_wall():
 			exit_wall_cling()
+	else:
+		# 空中收招要把动画交还给空中状态，否则会停在 charge_saber_jump 末帧，
+		# 空中斩状态没收、跳跃输入也一直被吞。
+		# 上升段放出来的话当前还在往上走，不能直接摆 fall 姿势。
+		if character.is_on_floor():
+			animatedSprite.animation = "recover"
+		elif character.get_vertical_speed() > 0:
+			animatedSprite.animation = "fall"
+		else:
+			animatedSprite.animation = "jump"
 	charge_cling = false
 	cling_timer = 0
 	var _fall_node = character.get_node("Fall")
 	_fall_node.horizontal_velocity = horizontal_velocity
-	if character.is_on_floor():
-		animatedSprite.animation = "recover"
 	if is_instance_valid(current_hitbox):
 		current_hitbox.queue_free()
 	if is_instance_valid(effect):

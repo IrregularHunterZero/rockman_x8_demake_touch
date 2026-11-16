@@ -351,6 +351,10 @@ func tick_dash_hold(delta: float) -> void:
 		dash_hold_consumed = false
 		dash_hold_started_ms = OS.get_ticks_msec()
 	dash_was_pressed = pressed
+	# 攻击期间按住冲刺也不保留意图：攻击收招后不该自己冲出去。
+	# 例外：空中蓄力斩判定段结束后“新按下的冲刺”是取消指令，留给 AirDash。
+	if attack_is_executing() and not can_dash_cancel_charge():
+		dash_hold_consumed = true
 	if pressed:
 		dash_hold_grace = dash_hold_grace_time
 		return
@@ -364,6 +368,23 @@ func dash_hold_available() -> bool:
 	if dash_hold_started_ms > 0 and OS.get_ticks_msec() - dash_hold_started_ms > int(dash_hold_max_age * 1000):
 		return false
 	return true
+
+func attack_is_executing() -> bool:
+	var charge = get_node_or_null("Charge")
+	if charge != null and charge.has_method("is_attack_in_progress"):
+		return charge.is_attack_in_progress()
+	return false
+
+# 空中蓄力斩的后摇：判定段（第 12 帧）之后新按下的冲刺可以取消。
+# 必须“新按下”，按住不放的那次冲刺仍然按攻击期间吞掉处理。
+func can_dash_cancel_charge() -> bool:
+	if not is_executing("SaberCharge"):
+		return false
+	if get_animation() != "charge_saber_jump":
+		return false
+	if animatedSprite.frame < 12:
+		return false
+	return get_action_just_pressed("dash")
 
 func consume_dash_hold() -> void:
 	dash_hold_consumed = true

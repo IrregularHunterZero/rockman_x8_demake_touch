@@ -541,6 +541,13 @@ func create_swordwave(ground_position, xspeed: float, yspeed: float, rotation_de
 	instance.call_deferred("initialize", get_facing_direction())
 
 func _StartCondition() -> bool:
+	# 剑装悬停中的普通攻击走地面普通攻击（SaberCombo），空中斩让路；
+	# 手炮（Z-Breaker）保留悬停里的空中手炮派生，但“下 + 攻击”让给 SaberCombo 的手炮下段。
+	if character.is_executing("HoverZero"):
+		if character.saber_node.current_weapon.name != "Z-Breaker":
+			return false
+		if character.get_action_pressed("move_down"):
+			return false
 	if CharacterManager.extra_saber_combo and CharacterManager.extra_saber_04 and character.saber_node.current_weapon.name == "Saber":
 		if character.get_action_pressed("move_down") and not character.get_action_pressed("move_left") and not character.get_action_pressed("move_right"):
 			return false
